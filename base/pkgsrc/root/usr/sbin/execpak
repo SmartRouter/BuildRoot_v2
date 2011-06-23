@@ -1,0 +1,33 @@
+#!/bin/sh
+#ExecPak 1.0 by Washington Rodrigues 2008#
+usage() {
+echo;echo "execpak [name of addon].";echo
+exit
+}
+MNT="/var/lib/lrpkg/mnt"
+. /tmp/boot.info
+[ -z "$1" ] && usage
+mount -o ro /dev/boot $MNT -t $FSTYPE
+FILENAME="$MNT/"`basename $1 .tgz`".tgz"
+[ ! -e "$FILENAME" ] && { echo;echo "Addon Packet not found!";echo;umount $MNT;exit; }
+rm -f /tmp/execpak.tmp 2>/dev/null
+LIST=`tar -tzf $FILENAME`
+[ "$?" != 0 ] && { echo;echo "Invalid Addon Packet";echo;umount $MNT;exit; }
+for FILES in $LIST; do
+    FINDRC=`echo $(basename $FILES) | grep -c -i "rc."`
+    [ "$FINDRC" = 1 ] && echo "$FILES" >> /tmp/execpak.tmp
+    FINDRC=`echo $(basename $FILES) | grep -c -i "mod."`
+    [ "$FINDRC" = 1 ] && echo "$FILES" >> /tmp/execpak.tmp
+
+done
+echo "Extracting Addon $(basename $1 .tgz).tgz"
+tar -xzf $FILENAME -C / 2>/dev/null
+umount $MNT 2>/dev/null
+echo "Executing Addon..."
+cat /tmp/execpak.tmp | while read FILE; do
+      [ -f "/$FILE" ] && . /$FILE
+done
+rm -f /tmp/execpak.tmp 2>/dev/null
+echo "done."
+echo      
+

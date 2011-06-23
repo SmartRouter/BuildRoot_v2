@@ -1,0 +1,30 @@
+# /etc/profile: system-wide .profile file for sh.
+# Fix FSTYPE by Washington Rodrigues 2008
+. /tmp/boot.info
+
+export PATH="/usr/local/bin:/usr/bin:/bin"
+export LD_LIBRARY_PATH="/usr/local/lib:/usr/lib:/lib"
+export TZ=`cat /etc/timezone`
+export HOSTNAME="$(hostname)"
+export PS1="$HOSTNAME$ "
+export TERMINFO='/etc/terminfo'
+
+umask 022
+
+#This fixes the backspace when telnetting in.
+if [ "$TERM" != "linux" ]; then
+        stty erase ^H
+fi
+
+alias dir="ls"
+alias vdir="ls -l"
+alias d="ls"
+alias v="ls -l"
+alias da="ls -a"
+alias va="ls -la"
+
+alias m="more"
+alias +="more"
+
+alias mt="mount /dev/boot /mnt -t $FSTYPE"
+alias umt="umount /mnt"

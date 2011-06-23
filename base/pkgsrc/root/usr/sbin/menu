@@ -1,0 +1,150 @@
+#!/bin/sh
+#New Menu by Washington Rodrigues 2008#
+
+[ -e "/tmp/reboot.tmp" ] && exit 0
+
+DIALOG=${DIALOG=dialog}
+BACKTITLE="BrazilFW Firewall and Router -- Configuration Menu"
+
+. /etc/coyote/coyote.conf
+. /tmp/netsubsys.state
+
+WAIT() {
+if [ -n "$1" ]; then
+   rm -f /tmp/TMP.done 2>/dev/null
+   ( while [ ! -e "/tmp/TMP.done" ]; do sleep 1 ; done | $DIALOG --backtitle "$BACKTITLE" --sleep 1 --infobox "$2" 4 40 ) &
+   else
+   touch "/tmp/TMP.done";wait;rm -f /tmp/TMP.done 2>/dev/null
+fi
+}   
+
+SHOWCFG() {
+WAIT " " "Loading configuration\nPlease wait..."
+/usr/sbin/showcfg | sed 's/.\[0;39m//g;s/.\[1;32m//g;s/.\[1;31m//g;s/.\[1;33m//g;s/.\[H.\[J//g' > /tmp/showcfg.tmp
+WAIT ""
+$DIALOG --begin 3 1 --backtitle "$BACKTITLE" --title "Show running configuration" --textbox "/tmp/showcfg.tmp" 20 76
+rm -f /tmp/showcfg.tmp 2>/dev/null
+}
+
+SHOWLOG() {
+WAIT " " "Reading system log..."
+logread > /tmp/logread.tmp
+WAIT ""
+$DIALOG --begin 3 1 --backtitle "$BACKTITLE" --title "System LOG" --textbox "/tmp/logread.tmp" 20 76
+rm -f /tmp/logread.tmp 2>/dev/null
+}
+
+FIREWALL() {
+WAIT " " "Reloading firewall rules\nPlease wait..."
+/etc/rc.d/rc.firewall > /tmp/firewall.msg
+WAIT ""
+$DIALOG --backtitle "$BACKTITLE" --title "Reload firewall" --textbox "/tmp/firewall.msg" 0 0
+rm -f /tmp/firewall.msg 2>/dev/null
+}
+
+DIALUP() {
+WAIT " " "Dialing..."
+/usr/sbin/ppp.dial > /tmp/dial.msg 2>/dev/null
+WAIT ""
+$DIALOG --backtitle "$BACKTITLE" --title "Dial PPP connection" --textbox "/tmp/dial.msg" 18 70
+rm -f /tmp/dial.msg 2>/dev/null
+}
+
+HANGUP() {
+WAIT " " "Hanging up..."
+/usr/sbin/ppp.hangup > /tmp/hangup.msg 2>/dev/null
+WAIT ""
+$DIALOG --backtitle "$BACKTITLE" --title "Hang up PPP connection" --textbox "/tmp/hangup.msg" 18 70
+rm -f /tmp/hangup.msg 2>/dev/null
+}
+
+BACKUP() {
+WAIT " " "Backing up your system...\nPlease wait..."
+/usr/sbin/lrcfg.back > /tmp/backup.msg 
+WAIT ""
+$DIALOG --backtitle "$BACKTITLE" --title "Backup system" --textbox "/tmp/backup.msg" 18 70
+rm -f /tmp/backup.msg 2>/dev/null
+}
+
+REBOOT() {
+subreturn=0
+$DIALOG --stdout --backtitle "$BACKTITLE" --title "Reboot system" --yes-label "NO" --no-label "YES" --yesno "Are you sure you want to reboot the system?" 5 54
+subreturn=$?
+[ "$subreturn" = 1 ] && { reboot; exit; }
+}
+
+SHUTDOWN() {
+subreturn=0
+$DIALOG --stdout --backtitle "$BACKTITLE" --title "Shutdown system" --yes-label "NO" --no-label "YES" --yesno "Are you sure you want to shutdown the system?" 5 54
+subreturn=$?
+[ "$subreturn" = 1 ] && { poweroff; exit; }
+}
+
+QUIT() {
+clear
+echo "Exiting menu. To return to the menu, simply type \"menu\" and"
+echo "hit ENTER from the command line."
+exit
+}
+
+
+while : ; do
+subreturn=0
+exec 3>&1
+value=`eval \
+$DIALOG --clear \
+	--backtitle \"$BACKTITLE\" \
+	--title \"Main Menu\" \
+	--ok-label \"Select\" \
+	--cancel-label \"Exit\" \
+	--begin 2 18 \
+	--menu \"\" 21 44 15\ $(
+	echo -e \"1\" \"Edit main configuration file\"\ 
+	echo -e \"2\" \"Change system password\"\ 
+	echo -e \"3\" \"Edit rc.local script file\"\ 
+	echo -e \"4\" \"Custom firewall rules file\"\ 
+	echo -e \"5\" \"Edit firewall configuration\"\ 
+	echo -e \"6\" \"Edit port forward configuration\"\ 
+	echo -e \"C\" \"Show running configuration\"\ 
+	if [ "$INETTYPE" = "PPP" ]; then
+           echo -e \"D\" \"Dial PPP connection\"\ 
+           echo -e \"H\" \"Hang up PPP connection\"\ 
+	fi
+	echo -e \"F\" \"Reload firewall\"\ 
+	echo -e \"G\" \"Run wizard guide\"\ 
+	[ -e "/usr/sbin/iptraf" ] && echo -e \"I\" \"IpTraf\"\ 
+	echo -e \"K\" \"System LOG\"\ 
+	echo -e \"R\" \"Reboot system\"\ 
+	echo -e \"S\" \"Shutdown system\"\ 
+	echo -e \"W\" \"Backup\"\ 
+	echo -e \"Q\" \"Quit\"\ 
+	echo -e \"L\" \"Logout\") 2>&1 1>&3`
+subreturn=$?
+exec 3>&-
+case $subreturn in               
+     1) QUIT;;
+     0)
+       case $value in
+            1) edit /etc/coyote/coyote.conf;;
+            2) /usr/sbin/chpasswd;;
+            3) edit /etc/rc.d/rc.local;;
+            4) edit /etc/coyote/firewall.local;;
+            5) edit /etc/coyote/firewall;;
+            6) edit /etc/coyote/portforwards;;
+            C) SHOWCFG;;
+            D) DIALUP;;
+            F) FIREWALL;; 
+            K) SHOWLOG;;
+            G) /usr/sbin/wizard;;
+            H) HANGUP;;
+            I) /usr/sbin/iptraf -l $IF_LOCAL;;
+            R) REBOOT;;
+            S) SHUTDOWN;;
+            W) BACKUP;;
+            Q) QUIT;;
+            L) clear
+               exit 10;               
+               ;;
+        esac;;   
+esac
+done

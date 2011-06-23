@@ -1,0 +1,7 @@
+#!/bin/sh
+
+# Set editor to use:
+EDITOR=/bin/e3ne
+
+# Launch the desired editor:
+eval $EDITOR "$@"

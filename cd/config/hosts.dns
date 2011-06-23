@@ -1,0 +1,6 @@
+# Include here the IP and the names of your local machines
+# you want to be resolved by Coyote DNS
+# Format:
+#IP_ADDRESS 		HOST.DOMAIN			ALIAS
+# Example
+#192.168.0.20		teste_machine.localdomain	teste_machine

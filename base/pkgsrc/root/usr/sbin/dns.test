@@ -1,0 +1,34 @@
+#!/bin/sh
+#
+# DNS test to coyote linux
+#
+# Claudio Roberto Cussuol
+# 19/06/2004
+#
+
+. /tmp/netsubsys.state
+
+if [ "$INET_UP" != "UP" ] ; then
+  echo "Your internet link is not connected"
+  exit 1
+else
+  echo "Trying to solve a.root-servers.net"
+  echo
+  response=`nslookup a.root-servers.net | tail -n 1 | sed s/Address:\ \ \ \ //`  
+  if [ $? = 0 ] ; then
+    [ -z "$response" ] && response="NOTHING"
+    echo Expecting: 198.41.0.4
+    echo Got......: $response
+    echo
+    if [ "$response" = "198.41.0.4" ] ; then
+      echo Your DNS system is OK.
+      exit 0	
+    else
+      echo Your DNS system is NOT WORKING.
+      exit 1
+    fi  
+  else  
+    echo Your DNS system is NOT WORKING.
+    exit 1
+  fi
+fi

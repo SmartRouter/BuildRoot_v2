@@ -1,0 +1,100 @@
+#!/bin/sh
+#
+# Save Profiles Script for Coyote Linux
+# Author:  Claudio Roberto Cussuol  
+#          29/05/2005
+#
+
+PROFILES_DIR=/etc/coyote/profiles
+TMP_DIR=/tmp/profile_tmp_dir
+PROFILE_NAME=""
+
+RELOAD_FIREWALL=
+RELOAD_QOS=
+RELOAD_DHCP=
+#ASK_CONFIRM=
+ASK_CONFIRM=NO
+
+HELP=
+QUIET=NO
+
+show_usage() {
+  if [ -n "$QUIET" ] ; then
+    echo "profile.save   Save current configuration to a profile"
+    echo 
+    echo 'Usage:         profile.save [options] profile-name'
+    echo "Options:       --help  or -h          See this information"
+    echo "               --quiet or -q          Do not show messages"
+    echo "               --yes   or -y          Do not ask for confirmation"
+  fi  
+}
+
+show_error() {
+  rm -rf $TMP_DIR > /dev/null
+  echo
+  echo ERROR: $1
+  exit 1 
+}
+
+while [ -n "$1" ] ; do
+  case "$1" in
+    -h|--help) HELP="YES" ; shift ;;
+    --yes|-y) ASK_CONFIRM="NO" ; shift ;;
+    --help|-h) HELP="YES" ; shift ;;
+    --quiet|-q) QUIET="" ; shift ;;
+    *) PROFILE_NAME="$1"
+       shift ;;
+  esac
+done
+
+if [ -n "$HELP" ] ; then
+  show_usage
+  exit 0
+fi
+if [ -z "$PROFILE_NAME" ] ; then
+  show_usage
+  show_error "Mising profile name"
+fi
+if [ "`echo $PROFILE_NAME | cut -b 1`" = "-" ] ; then
+  show_usage
+  show_error "Invalid Option"
+fi
+
+PROFILE_NAME=`basename $PROFILE_NAME .prf`
+[ $? != 0 ] && show_error "Invalid profile name" 
+
+if [ -e "$PROFILES_DIR/$PROFILE_NAME.prf" -a -z "$ASK_CONFIRM" ] ; then
+  echo "The profile $PROFILE_NAME exists"
+  echo -n "Do you want to overwrite it ? [N] - "
+  read YN
+  [ "$YN" != "Y" -a "$YN" != "y" ] && exit 0
+fi  
+
+if [ ! -e "$PROFILES_DIR" ] ; then
+  mkdir $PROFILES_DIR >> /dev/null
+  [ $? != 0 ] && show_error "Unable to create profiles directory: $PROFILES_DIR" 
+fi
+
+echo > $PROFILES_DIR/$PROFILE_NAME.prf
+[ $? != 0 ] && show_error "Unable to create the file: $PROFILE_NAME.prf" 
+
+[ -n "$QUIET" ] && echo Saving profile: $PROFILE_NAME
+rm -rf $TMP_DIR > /dev/null
+mkdir  $TMP_DIR > /dev/null
+[ $? != 0 ] && show_error "Unable to create temp directory" 
+
+cat /var/lib/lrpkg/*.config_files | while read f; do
+  f1=`echo $f | cut -f 1 -d " "`
+  f2=`echo $f | cut -f 2 -d " "`
+  [ -n "$QUIET" ] && echo $f1
+  cat /etc/coyote/$f2 | dos2unix -d > $TMP_DIR/$f1
+done
+
+HERE=`pwd`
+cd $TMP_DIR
+tar -czf $PROFILES_DIR/$PROFILE_NAME.prf * > /dev/null
+[ $? != 0 ] && show_error "Unable to compress profile files" 
+cd $HERE
+rm -rf $TMP_DIR > /dev/null
+
+[ -n "$QUIET" ] && echo Done

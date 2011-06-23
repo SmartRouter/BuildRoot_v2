@@ -1,0 +1,24 @@
+#!/bin/sh
+# Formato do HEADER
+# TIPO (PATA/SCSI/USB) DISPOSITIVO MODELO CAPACIDADE CILINDROS CABECAS SETORES
+cat /proc/partitions | awk -F" " '{ print $4 }' | sort | while read DEVICE; do
+INFOHD="false"
+case $DEVICE in
+     hd?)
+       if [ "$(cat /proc/ide/$DEVICE/media)" = "disk" ]; then
+          TYPE="PATA";MODEL=`cat /proc/ide/$DEVICE/model`;INFOHD="true"
+       fi  
+         ;;
+     sd?)
+          SCSI=`scsi_info /dev/$DEVICE 2>/dev/null`
+          MODEL=`echo $SCSI | sed 's/.*MODEL=\"//g;s/\".*//g'`
+          HOST=`echo $SCSI | sed 's/.*HOST=\"//g;s/\".*//g'`
+          TYPE="SCSI"
+          if [ -e "/proc/scsi/usb-storage-$HOST/$HOST" ]; then
+             [ "$(cat /proc/scsi/usb-storage-$HOST/$HOST | grep -c -i "usb-storage")" = 1 ] && TYPE="USB"
+          fi   
+          INFOHD="true"          
+         ;;
+esac             
+[ "$INFOHD" = "true" ] && echo "$TYPE#$DEVICE#$MODEL#"`echo $(cat /proc/partitions | grep "$DEVICE\>" | awk -F" " '{ print (int($3/1024)) }')``echo $(sfdisk -g /dev/$DEVICE | awk -F" " '{ print $2,$4,$6 }' | sed 's/\ */#/g')`
+done

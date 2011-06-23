@@ -1,0 +1,2 @@
+#!/bin/sh
+/sbin/acpid -c /etc/acpi/events -s /var/run/acpid.socket

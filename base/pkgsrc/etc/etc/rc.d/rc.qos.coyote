@@ -1,0 +1,450 @@
+#!/bin/sh
+#
+# Coyote Traffic Control startup script
+# Author: Dolly <dolly@czi.cz>
+#
+# Changed to support Level 7 filtering
+# Claudio Roberto Cussuol - 06/16/2005
+
+TC=/usr/sbin/tc
+IPTABLES=/usr/sbin/iptables
+
+#TC=echo
+#IPTABLES=echo
+
+# define SFQ subclass : 1-rootclass
+define_class_base_sfq() {
+
+   subclasspart=`echo ${1} | cut -f2 -d':'`
+
+   echo "   - SFQ subclass ${subclasspart}: on $IF_LOCAL, $IF_INET"
+   $TC qdisc add dev $IF_LOCAL parent ${1} handle $subclasspart: sfq perturb 10
+   $TC qdisc add dev $IF_INET  parent ${1} handle $subclasspart: sfq perturb 10
+}
+
+# define QOS subclasses : 1-rootclass, 2-band, 3-ceil, 4-up_band, 5-up_ceil
+define_class_base_qos() {
+
+   DOWN_HIGH_PRI=$(percentage ${2} $QOS_HIGH_PRI_PER)
+   DOWN_NORM_PRI=$(percentage ${2} $QOS_NORM_PRI_PER)
+   DOWN_SLOW_PRI=$(percentage ${2} $QOS_SLOW_PRI_PER)
+
+   UP_HIGH_PRI=$(percentage ${4} $QOS_HIGH_PRI_PER)
+   UP_NORM_PRI=$(percentage ${4} $QOS_NORM_PRI_PER)
+   UP_SLOW_PRI=$(percentage ${4} $QOS_SLOW_PRI_PER)
+
+   subclasspart=`echo ${1} | cut -f2 -d':'`
+   high_cls_id=$(($subclasspart*10))
+   norm_cls_id=$(($subclasspart*10+1))
+   slow_cls_id=$(($subclasspart*10+2))
+
+   echo "   - QOS subclasses... downstream... ${IF_LOCAL}"
+
+   echo "     - high prio... prio 0, classid 1:$high_cls_id, rate ${DOWN_HIGH_PRI}kbps, ceil ${3}kbps, burst: ${QOS_FDOWN_BURST}k"
+   $TC class add dev $IF_LOCAL parent ${1} classid 1:$high_cls_id htb prio 0 rate ${DOWN_HIGH_PRI}kbit ceil ${3}kbit burst ${QOS_FDOWN_BURST}k
+
+   echo "     - norm prio... prio 1, classid 1:$norm_cls_id, rate ${DOWN_NORM_PRI}kbps, ceil ${3}kbps, burst: ${QOS_NDOWN_BURST}k"
+   $TC class add dev $IF_LOCAL parent ${1} classid 1:$norm_cls_id htb prio 1 rate ${DOWN_NORM_PRI}kbit ceil ${3}kbit burst ${QOS_NDOWN_BURST}k
+
+   echo "     - slow prio... prio 2, classid 1:$slow_cls_id, rate ${DOWN_SLOW_PRI}kbps, ceil ${3}kbps, burst: ${QOS_SDOWN_BURST}k"
+   $TC class add dev $IF_LOCAL parent ${1} classid 1:$slow_cls_id htb prio 2 rate ${DOWN_SLOW_PRI}kbit ceil ${3}kbit burst ${QOS_SDOWN_BURST}k
+
+   echo "     - SFQ ${IF_LOCAL}... $high_cls_id:, $norm_cls_id:, $slow_cls_id:"
+
+   $TC qdisc add dev $IF_LOCAL parent 1:${high_cls_id} handle $high_cls_id: sfq perturb 10
+   $TC qdisc add dev $IF_LOCAL parent 1:${norm_cls_id} handle $norm_cls_id: sfq perturb 10
+   $TC qdisc add dev $IF_LOCAL parent 1:${slow_cls_id} handle $slow_cls_id: sfq perturb 10
+
+
+   echo "   - QOS subclasses... upstream... ${IF_INET}"
+
+   echo "     - high prio... prio 0, classid 1:$high_cls_id, rate ${UP_HIGH_PRI}kbps, ceil ${5}kbps, burst: ${QOS_FUP_BURST}k"
+   $TC class add dev $IF_INET parent ${1} classid 1:$high_cls_id htb prio 0 rate ${UP_HIGH_PRI}kbit ceil ${5}kbit burst ${QOS_FUP_BURST}k
+
+   echo "     - norm prio... prio 1, classid 1:$norm_cls_id, rate ${UP_NORM_PRI}kbps, ceil ${5}kbps, burst: ${QOS_NUP_BURST}k"
+   $TC class add dev $IF_INET parent ${1} classid 1:$norm_cls_id htb prio 1 rate ${UP_NORM_PRI}kbit ceil ${5}kbit burst ${QOS_NUP_BURST}k
+
+   echo "     - slow prio... prio 2, classid 1:$slow_cls_id, rate ${UP_SLOW_PRI}kbps, ceil ${5}kbps, burst: ${QOS_SUP_BURST}k"
+   $TC class add dev $IF_INET parent ${1} classid 1:$slow_cls_id htb prio 2 rate ${UP_SLOW_PRI}kbit ceil ${5}kbit burst ${QOS_SUP_BURST}k
+
+   echo "     - SFQ ${IF_INET}... $high_cls_id:, $norm_cls_id:, $slow_cls_id:"
+
+   $TC qdisc add dev $IF_INET parent 1:${high_cls_id} handle $high_cls_id: sfq perturb 10
+   $TC qdisc add dev $IF_INET parent 1:${norm_cls_id} handle $norm_cls_id: sfq perturb 10
+   $TC qdisc add dev $IF_INET parent 1:${slow_cls_id} handle $slow_cls_id: sfq perturb 10
+}
+
+# Define downstream class categorization filter
+# 1-device, 2-root, 3-clsid, 4-matchip
+define_class_filter_down () {
+
+    echo "   - TC down filter in class ${2}, ip ${4}, destination ${3}"
+
+    $TC filter add dev ${1} protocol ip parent ${2} pref 100 u32 \
+	match ip dst ${4} flowid ${3}
+}
+
+
+# Define upstream class categorization filter
+# 1-device, 2-root, 3-clsid, 4-matchip
+define_class_filter_up () {
+
+    subclasspart=`echo ${3} | cut -f2 -d':'`
+
+    echo "   - TC iptables set mark ${subclasspart} for ip ${4}"
+
+    $IPTABLES -A PREROUTING -t mangle -s ${4} -j MARK --set-mark ${subclasspart}
+
+    echo "   - TC up filter in class 1:, handle ${subclasspart}, destination ${3}"
+
+    $TC filter add dev ${1} parent 1: protocol ip handle ${subclasspart} pref 100 fw classid 1:${subclasspart}
+}
+
+
+# Defines computer/network class
+# 1-root, 2-classid, 3-band, 4-ceil, 5-up_band, 6-up_ceil, 7-matchip
+define_class_base () {
+
+    echo " - device: $IF_LOCAL, classid: ${2}, root: ${1}, rate: ${3}kbps, ceil: ${4}kbps, burst: ${QOS_FDOWN_BURST}k"
+    $TC class add dev $IF_LOCAL parent ${1} classid ${2} htb prio 1 rate ${3}kbit ceil ${4}kbit burst ${QOS_FDOWN_BURST}k
+
+    echo " - device: $IF_INET, classid: ${2}, root: ${1}, rate: ${5}kbps, ceil: ${6}kbps, burst: ${QOS_FUP_BURST}k"
+    $TC class add dev $IF_INET parent ${1} classid ${2} htb prio 1 rate ${5}kbit ceil ${6}kbit burst ${QOS_FUP_BURST}k
+
+    echo "   - TC filter: delete old upstream/downstream filters for class ${2}"
+
+    $TC filter del dev $IF_LOCAL parent ${2} pref 100  2>/dev/null
+    $TC filter del dev $IF_INET  parent ${2} pref 100  2>/dev/null
+
+    define_class_filter_down $IF_LOCAL $1 $2 $7
+    define_class_filter_up   $IF_INET  $1 $2 $7
+}
+
+# define class : # 1-root, 2-classid, 3-band, 4-ceil, 5-up_band, 6-up_ceil,  7-matchip
+define_class () {
+    define_class_base $1 $2 $3 $4 $5 $6 $7
+}
+
+
+# define class with sfq subclass : 1-root, 2-classid, 3-band, 4-ceil, 5-up_band, 6-up_ceil, 7-matchip
+define_class_sfq () {
+    define_class_base $1 $2 $3 $4 $5 $6 $7
+    define_class_base_sfq $2
+}
+
+
+# define downstream class with qos subclasses : # 1-root, 2-classid, 3-band, 4-ceil, 5-up_band, 6-up_ceil, 7-matchip
+define_class_qos () {
+    define_class_base $1 $2 $3 $4 $5 $6 $7
+    define_class_base_qos $2 $3 $4 $5 $6
+    define_qos_downstream_filters $2
+    define_qos_upstream_filters $2
+}
+
+## Builds UPSTREAM QOS filter chain :  $1-rootid
+define_qos_upstream_filters () {
+
+   subclasspart=`echo ${1} | cut -f2 -d':'`
+   high_cls_id=$(($subclasspart*10))
+   norm_cls_id=$(($subclasspart*10+1))
+   slow_cls_id=$(($subclasspart*10+2))
+
+   echo "   - creating QOS up filters for root class ${1}, to clsids 1:${high_cls_id} 1:${norm_cls_id} 1:${slow_cls_id}"
+
+# Prioritize ACK packets
+$TC filter add dev $IF_INET protocol ip parent ${1} pref 100 u32 \
+	match ip protocol 6 0xff \
+	match u8 0x05 0x0f at 0 \
+	match u16 0x0000 0xffc0 at 2 \
+	match u8 0x10 0xff at 33 \
+	flowid 1:${high_cls_id}
+
+# TOS minimize delay to fast flow
+#$TC filter add dev $IF_INET protocol ip parent ${1} pref 100 u32 \
+#	match ip tos 0x10 0xff \
+#	flowid 1:${high_cls_id}
+
+if [ -r /etc/coyote/qos.filters ]; then
+	echo "   - configuring custom upstream QOS filter rules..."
+	echo -n "     - progress "
+	LINE=0
+	cat /etc/coyote/qos.filters | while read QOSRULE; do
+		LINE=$(($LINE+1))
+		case "$QOSRULE" in
+			\#*|"") continue ;;
+			slow*) set_qos_filter "up" $IF_INET $1 ${slow_cls_id} $QOSRULE ;;
+			fast*) set_qos_filter "up" $IF_INET $1 ${high_cls_id} $QOSRULE ;;
+		esac
+	done
+	echo
+fi
+
+ # Other traffic goes to normal flow
+$TC filter add dev $IF_INET protocol ip parent ${1} pref 100 u32 \
+	match ip src 0.0.0.0/0 \
+	flowid 1:${norm_cls_id}
+
+}
+
+## Builds downstream QOS filter chain : $1-rootid
+define_qos_downstream_filters () {
+
+   subclasspart=`echo ${1} | cut -f2 -d':'`
+   high_cls_id=$(($subclasspart*10))
+   norm_cls_id=$(($subclasspart*10+1))
+   slow_cls_id=$(($subclasspart*10+2))
+
+   echo "   - creating QOS down filters for root class ${1}, to clsids 1:${high_cls_id} 1:${norm_cls_id} 1:${slow_cls_id}"
+
+ # Prioritize ACK packets (small TCP packets witch ACK field set)
+$TC filter add dev $IF_LOCAL protocol ip parent ${1} pref 100 u32 \
+	match ip protocol 6 0xff \
+	match u8 0x05 0x0f at 0 \
+	match u16 0x0000 0xffc0 at 2 \
+	match u8 0x10 0xff at 33 \
+	flowid 1:${high_cls_id}
+
+ # TOS minimize delay to fast flow
+#$TC filter add dev $IF_LOCAL protocol ip parent ${1} pref 100 u32 \
+#	match ip tos 0x10 0xff \
+#	flowid 1:${high_cls_id}
+
+if [ -r /etc/coyote/qos.filters ]; then
+	echo "   - configuring custom downstream QOS filter rules..."
+	echo -n "     - progress "
+	LINE=0
+	cat /etc/coyote/qos.filters | while read QOSRULE; do
+		LINE=$(($LINE+1))
+		case "$QOSRULE" in
+			\#*|"") continue ;;
+			slow*) set_qos_filter "down" $IF_LOCAL $1 ${slow_cls_id} $QOSRULE ;;
+			fast*) set_qos_filter "down" $IF_LOCAL $1 ${high_cls_id} $QOSRULE ;;
+		esac
+	done
+	echo
+fi
+
+  # Match other
+$TC filter add dev $IF_LOCAL protocol ip parent ${1} pref 100 u32 \
+	match ip dst 0.0.0.0/0 \
+	flowid 1:${norm_cls_id}
+}
+
+
+# parses /etc/coyote/qos.filters rules
+set_qos_filter() {
+        if [ $# -lt 12 ]; then
+		echo "   Invalid rule line# $LINE in /etc/coyote/qos.filters"
+		return 1
+	fi
+
+	echo -n .
+
+        if [ "$6" = "Y" ]; then
+
+		# Protocol Option
+		PROTO=`echo $7 | tr [A-Z] [a-z]`
+        	PROTOOPT=
+		if [ "$PROTO" = "any" -o "$PROTO" = "all" ]; then
+			PROTOOPT=""
+		elif [ "$PROTO" -ge 0 -a "$PROTO" -le 255 ] 2>/dev/null; then
+			PROTOOPT="match ip protocol $PROTO 0xff"
+		elif [ "$PROTO" = "icmp" -o "$PROTO" = "tcp" -o "$PROTO" = "udp" ]; then
+		    PROTO_NUM=6
+		    case "$PROTO" in
+			tcp)  PROTO_NUM=6 ;;
+			icmp) PROTO_NUM=1 ;;
+			udp)  PROTO_NUM=17 ;;
+		    esac
+		    PROTOOPT="match ip protocol $PROTO_NUM 0xff"
+		else
+			echo "   QOS filter rule line# $LINE - protocol option error"
+			return 1
+		fi
+
+
+		# Remote-Port Option
+		REM_PORT=`echo $8 | tr [A-Z] [a-z]`
+        	REM_PORTOPT=
+		if [ "$REM_PORT" = "any" -o "$REM_PORT" = "all" ] || [ "$REM_PORT" -eq 0 ] 2>/dev/null; then
+			REM_PORTOPT=""
+		elif [ ! -z "$REM_PORT" ]; then
+			REM_PORTOPT=$REM_PORT
+		else
+			echo "   QOS filter rule line# $LINE - remote_port option error"
+			return 1
+		fi
+
+		# Remote-Mask Option
+		REM_MASK=$9
+        	REM_MASKOPT=
+		if [ "$REM_MASK" = "any" -o "$REM_MASK" = "all" ] || [ "$REM_MASK" -eq 0 ] 2>/dev/null; then
+			REM_MASKOPT=""
+		else
+			REM_MASKOPT=$REM_MASK
+		fi
+
+		# Local-Port Option
+		LOC_PORT=`echo $11 | tr [A-Z] [a-z]`
+        	LOC_PORTOPT=
+		if [ "$LOC_PORT" = "any" -o "$LOC_PORT" = "all" ] || [ "$LOC_PORT" -eq 0 ] 2>/dev/null;  then
+			LOC_PORTOPT=
+		elif [ ! -z "$LOC_PORT" ]; then
+			LOC_PORTOPT=$LOC_PORT
+		else
+			echo "   QOS filter rule line# $LINE - local_port option error"
+			return 1
+		fi
+
+		# Local-Mask Option
+		LOC_MASK=$12
+        	LOC_MASKOPT=
+		if [ "$LOC_MASK" = "any" -o "$LOC_MASK" = "all" ] || [ "$LOC_MASK" -eq 0 ] 2>/dev/null; then
+			LOC_MASKOPT=
+		else
+			LOC_MASKOPT=$LOC_MASK
+		fi
+
+
+		REMOTE_PART=
+		if [ ! -z "$REM_PORTOPT" ] && [ !  -z "$REM_MASKOPT" ]; then
+		  if [ $1 = down ]; then
+			REMOTE_PART="match ip sport $REM_PORTOPT 0x$REM_MASKOPT"
+		  elif [ $1 = up ]; then
+			REMOTE_PART="match ip dport $REM_PORTOPT 0x$REM_MASKOPT"
+		  else
+			echo "	QOS filter error up/down directive."
+			return 1
+		  fi
+		fi
+
+		LOCAL_PART=
+		if [ ! -z "$LOC_PORTOPT" ] && [ ! -z "$LOC_MASKOPT" ]; then
+		  if [ $1 = down ]; then
+			LOCAL_PART="match ip dport $LOC_PORTOPT 0x$LOC_MASKOPT"
+		  elif [ $1 = up ]; then
+			LOCAL_PART="match ip sport $LOC_PORTOPT 0x$LOC_MASKOPT"
+		  else
+			echo "	QOS filter error up/down directive."
+			return 1
+		  fi
+		fi
+
+		#echo Local: $LOCAL_PART, Remote: $REMOTE_PART, Proto: $PROTOOPT
+		if [ $10 = and ]; then
+			$TC filter add dev ${2} protocol ip parent ${3} pref 100 u32 \
+			$PROTOOPT $REMOTE_PART $LOCAL_PART \
+			flowid 1:${4}
+
+		elif [ $10 = or ]; then
+
+			if [ "$REMOTE_PART" != "" ]; then
+				$TC filter add dev ${2} protocol ip parent ${3} pref 100 u32 \
+				$PROTOOPT $REMOTE_PART \
+				flowid 1:${4}
+			fi
+
+			if [ "$LOCAL_PART" != "" ]; then
+				$TC filter add dev ${2} protocol ip parent ${3} pref 100 u32 \
+				$PROTOOPT $LOCAL_PART \
+				flowid 1:${4}
+			fi
+		else
+			echo "	QOS filter invalid and/or option."
+			return 1
+		fi
+	else
+		return 0
+	fi
+}
+
+
+eval `ipcalc -p -n $LOCAL_IPADDR $LOCAL_NETMASK`
+TEMP_LOCAL_NET="$NETWORK/$PREFIX"
+
+echo "* Initializing Traffic control, building root classes..."
+
+# DOWNSTREAM Root qdisc, divide local and inet traffic to separate classes
+$TC qdisc add dev $IF_LOCAL root handle 1: htb default 90 r2q 1
+
+$TC class add dev $IF_LOCAL parent 1: classid 1:1 htb rate ${QOS_DOWNSTREAM}kbit burst ${QOS_FDOWN_BURST}k
+
+$TC class add dev $IF_LOCAL parent 1: classid 1:2 htb rate 10mbit burst ${QOS_FDOWN_BURST}k
+
+# UPSTREAM Root qdisc, default class internet traffic to firewall class
+$TC qdisc add dev $IF_INET root handle 1: htb default 89 r2q 1
+
+$TC class add dev $IF_INET parent 1: classid 1:1 htb rate ${QOS_UPSTREAM}kbit burst ${QOS_FUP_BURST}k
+
+echo "* Initializing packet mangling..."
+
+# Initialize upstream packet mangling
+$IPTABLES -A PREROUTING -t mangle -s $TEMP_LOCAL_NET -j MARK --set-mark 255
+
+echo "* Computing bandwidth for junk and direct fw->inet classes"
+
+UP_FW_STREAM=$(percentage $QOS_UPSTREAM $QOS_UPFW_STREAM)
+UPSTREAM_JUNK=$(percentage $QOS_UPSTREAM $QOS_UPSTREAM_JUNK)
+DOWNSTREAM_JUNK=$(percentage $QOS_DOWNSTREAM $QOS_DOWNSTREAM_JUNK)
+
+echo "   * upstream junk: ${QOS_UPSTREAM_JUNK}% (${UPSTREAM_JUNK}kbps), downstream junk: ${QOS_DOWNSTREAM_JUNK}% (${DOWNSTREAM_JUNK}kbps), direct fw->inet: ${QOS_UPFW_STREAM}% (${UP_FW_STREAM}kbps)"
+
+CLEAR_UPSTREAM=$((${QOS_UPSTREAM}-${UP_FW_STREAM}-${UPSTREAM_JUNK}))
+CLEAR_DOWNSTREAM=$((${QOS_DOWNSTREAM}-${DOWNSTREAM_JUNK}))
+
+echo "   * clear upstream: ${CLEAR_UPSTREAM}kbps, clear downstream: ${CLEAR_DOWNSTREAM}kbps."
+
+COMP_UP=$(percentage $CLEAR_UPSTREAM $QOS_UPSTREAM_INDIVIDUAL)
+COMP_DOWN=$(percentage $CLEAR_DOWNSTREAM $QOS_DOWNSTREAM_INDIVIDUAL)
+
+echo "   * individual upstream: ${COMP_UP}kbps, individual downstream: ${COMP_DOWN}kbps."
+
+echo "* Building Downstream/Upstream classes..."
+
+if [ "$QOS_TYPE" = "COYOTE_DEFAULT" ]; then
+	echo "QOS: using Coyote init scripts with default config"
+
+	define_class_qos	\
+	"1:1" "1:10"		\
+	$CLEAR_DOWNSTREAM $QOS_DOWNSTREAM \
+	$CLEAR_UPSTREAM $QOS_UPSTREAM	\
+	$TEMP_LOCAL_NET
+
+elif [ "$QOS_TYPE" = "COYOTE_MANUAL" ]; then
+	echo "QOS: using Coyote init scripts with manual config"
+	build_class_chain
+else
+	echo "QOS: QOS_TYPE configuration set for another init type"
+	exit
+fi
+
+## Junk and direct FW definition
+
+echo " - downstream junk (default) class: ${DOWNSTREAM_JUNK}kbps, ceil: ${QOS_DOWNSTREAM}kbps, burst: ${QOS_SDOWN_BURST}k"
+$TC class add dev $IF_LOCAL parent 1:1 classid 1:90 htb prio 2 rate ${DOWNSTREAM_JUNK}kbit ceil ${QOS_DOWNSTREAM}kbit burst ${QOS_SDOWN_BURST}k
+$TC qdisc add dev $IF_LOCAL parent 1:90 handle 90: sfq perturb 10
+
+
+echo " - upstream junk (default) class: ${UPSTREAM_JUNK}kbps, ceil: ${QOS_UPSTREAM}kbps, burst: ${QOS_SUP_BURST}k"
+$TC class add dev $IF_INET parent 1:1 classid 1:90 htb prio 2 rate ${UPSTREAM_JUNK}kbit ceil ${QOS_UPSTREAM}kbit burst ${QOS_SUP_BURST}k
+$TC qdisc add dev $IF_INET parent 1:90 handle 90: sfq perturb 10
+
+
+echo " - direct fw->inet class: ${UP_FW_STREAM}kbps, ceil: ${QOS_UPSTREAM}kbps, burst: ${QOS_NUP_BURST}k"
+$TC class add dev $IF_INET parent 1:1 classid 1:89 htb prio 1 rate ${UP_FW_STREAM}kbit ceil ${QOS_UPSTREAM}kbit burst ${QOS_NUP_BURST}k
+$TC qdisc add dev $IF_INET parent 1:89 handle 89: sfq perturb 10
+
+## Root Categorization FILTERS
+echo "* Building new root DOWNSTREAM/UPSTREAM filters ..."
+
+# Match traffic from firewall, enque to fast flow
+$TC filter add dev $IF_LOCAL protocol ip parent 1: pref 100 u32 \
+	match ip src $TEMP_LOCAL_NET flowid 1:2
+
+# Match traffic for local network
+$TC filter add dev $IF_LOCAL protocol ip parent 1: pref 100 u32 \
+	match ip dst $TEMP_LOCAL_NET flowid 1:1
+
+# Match traffic from local network
+$TC filter add dev $IF_INET parent 1: protocol ip handle 255 pref 100 fw classid 1:90
+echo "* Computing bandwidth for junk and direct fw->inet classes"

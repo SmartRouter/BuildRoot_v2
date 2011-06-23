@@ -1,0 +1,196 @@
+#!/bin/sh
+#
+# showcfg: Displays the IP settings for this Coyote Gateway computer.
+# Changed by: Claudio Roberto Cussuol - 08-07-2004
+
+if [ "$1" != "-w" ]; then
+clear
+RED=`echo -en "\\033[1;31m"`
+YELLOW=`echo -en "\\033[1;33m"`
+GREEN=`echo -en "\\033[1;32m"`
+NORM=`echo -en "\\033[0;39m"`
+fi
+
+echo "BrazilFW running configuration display utility."
+echo "-------------------------------------------------"
+
+# Load the master coyote configuration file
+if [ -f /etc/coyote/coyote.conf ]; then
+	. /etc/coyote/coyote.conf
+else
+	echo "${YELLOW}ERROR${NORM}: Unable to load BrazilFW configuration file."
+fi
+
+# Check the status of the network subsystems
+if [ -f /tmp/netsubsys.state ]; then
+	. /tmp/netsubsys.state
+else
+	echo "${YELLOW}ERROR${NORM}: Unable to determine the state of the network subsystems."
+	exit
+fi
+
+cor_status() {
+	case $1 in
+		UP) STATUS="$GREEN";;
+		DOWN) STATUS="$RED";;
+		*) STATUS="$YELLOW";;
+	esac
+}
+
+status () {
+case $1 in
+	LAN)    cor_status $LOCAL_UP ;;
+	LOCAL2) cor_status $LOCAL2_UP ;;
+	LOCAL3) cor_status $LOCAL3_UP ;;
+	LOCAL4) cor_status $LOCAL4_UP ;;
+	WLAN)   cor_status $WLAN_UP ;;
+	DMZ)    cor_status $DMZ_UP ;;
+	WAN)    cor_status $INET_UP ;;
+	INET2)  cor_status $INET2_UP ;;
+	INET3)  cor_status $INET3_UP ;;
+	INET4)  cor_status $INET4_UP ;;
+        *)      STATUS="$YELLOW";;
+esac
+}
+
+status WAN; echo "Internet     (${IF_INET}): ${STATUS}${INET_UP}${NORM}"
+[ ! -z $INET2_IPADDR ] && status INET2 && echo "Internet 2   (${IF_INET2}): ${STATUS}${INET2_UP}${NORM}"
+[ ! -z $INET3_IPADDR ] && status INET3 && echo "Internet 3   (${IF_INET3}): ${STATUS}${INET3_UP}${NORM}"
+[ ! -z $INET4_IPADDR ] && status INET4 && echo "Internet 4   (${IF_INET4}): ${STATUS}${INET4_UP}${NORM}"
+status LAN; echo "LAN network  (${IF_LOCAL}): ${STATUS}${LOCAL_UP}${NORM}"
+[ ! -z $LOCAL2_IPADDR ] && status LOCAL2 && echo "LAN2 network (${IF_LOCAL2}): ${STATUS}${LOCAL2_UP}${NORM}"
+[ ! -z $LOCAL3_IPADDR ] && status LOCAL3 && echo "LAN3 network (${IF_LOCAL3}): ${STATUS}${LOCAL3_UP}${NORM}"
+[ ! -z $LOCAL4_IPADDR ] && status LOCAL4 && echo "LAN4 network (${IF_LOCAL4}): ${STATUS}${LOCAL4_UP}${NORM}"
+[ ! -z $WLAN_IPADDR ] && status WLAN && echo "WLAN network (${IF_WLAN}): ${STATUS}${WLAN_UP}${NORM}"
+[ ! -z $DMZ_IPADDR ] && status DMZ && echo "DMZ network  (${IF_DMZ}): ${STATUS}${DMZ_UP}${NORM}"
+
+UPTIME=`uptime`
+
+status WAN; echo "-------------${STATUS}Internet configuration${NORM}--------------"
+# If the DHCP configuration file exists, load it
+case "$INETTYPE" in
+	"ETHERNET_DHCP")
+		if [ -f /etc/dhcpc/$IF_INET.info ]; then
+			. /etc/dhcpc/$IF_INET.info 2>/dev/null
+			echo "IP Address   ${dhcp_ip} (DHCP Assigned)"
+			eval `ipcalc -m ${dhcp_ip}/${dhcp_mask}`
+			echo "Netmask      ${NETMASK}"
+			echo "Gateway      ${dhcp_router}"
+		else
+			echo "ERROR: Unable to load DHCP client information."
+		fi
+		;;
+	"ETHERNET_STATIC")
+		if [ ! -z ${IPADDR2} ] || [ ! -z ${IPADDR3} ]; then
+			echo "IP Address   ${IPADDR} / ${NETMASK} (Static)"
+		else
+			echo "IP Address   ${IPADDR} (Static)"
+		fi
+		[ ! -z ${IPADDR2} ] && echo "Secondary IP ${IPADDR2} / ${NETMASK2}"
+		[ ! -z ${IPADDR3} ] && echo "Secondary IP ${IPADDR3} / ${NETMASK3}"
+		[ ! -z ${IPADDR2} ] || [ ! -z ${IPADDR3} ] || echo "Netmask      ${NETMASK}"
+		echo "Gateway      ${GATEWAY}"
+		;;
+	"PPP"|"PPPOE")
+		PPPIP=`getifaddr ppp0`
+		if [ $? = 0 ]; then
+			echo "PPP Assigned IP Address: $PPPIP"
+			[ -n "$CONNECTTIME" ]   && echo "Connected Since........: $CONNECTTIME"
+			[ -n "$CONNECTSTRING" ] && echo "Connect String.........: $CONNECTSTRING"
+		else
+			echo "Unable to obtain IP Address for PPP Interface, it may currently be offline."
+		fi
+		;;
+
+	*)
+		echo "Your Internet connection type ( ${INETTYPE} ) is not currently supported by this utility."
+		;;
+esac
+
+if [ ! -z $INET2_IPADDR ]; then
+  status INET2; echo "----------------${STATUS}INET2 configuration${NORM}---------------"
+  echo "IP Address   ${INET2_IPADDR}"
+  echo "Netmask      ${INET2_NETMASK}"
+  echo "Gateway      ${INET2_GATEWAY}"
+fi
+if [ ! -z $INET3_IPADDR ]; then
+  status INET3; echo "----------------${STATUS}INET3 configuration${NORM}---------------"
+  echo "IP Address   ${INET3_IPADDR}"
+  echo "Netmask      ${INET3_NETMASK}"
+  echo "Gateway      ${INET3_GATEWAY}"
+fi
+if [ ! -z $INET4_IPADDR ]; then
+  status INET4; echo "----------------${STATUS}INET4 configuration${NORM}---------------"
+  echo "IP Address   ${INET4_IPADDR}"
+  echo "Netmask      ${INET4_NETMASK}"
+  echo "Gateway      ${INET4_GATEWAY}"
+fi
+
+status LAN; echo "----------------${STATUS}LAN configuration${NORM}----------------"
+if [ ! -z ${LOCAL_IPADDR2} ] || [ ! -z ${LOCAL_IPADDR3} ]; then
+	echo "IP Address   ${LOCAL_IPADDR} / ${LOCAL_NETMASK}"
+else
+	echo "IP Address   ${LOCAL_IPADDR}"
+fi
+[ ! -z ${LOCAL_IPADDR2} ] && echo "Secondary IP ${LOCAL_IPADDR2} / ${LOCAL_NETMASK2}"
+[ ! -z ${LOCAL_IPADDR3} ] && echo "Secondary IP ${LOCAL_IPADDR3} / ${LOCAL_NETMASK3}"
+[ ! -z ${LOCAL_IPADDR2} ] || [ ! -z ${LOCAL_IPADDR3} ] || echo "Netmask      ${LOCAL_NETMASK}"
+
+if [ ! -z $LOCAL2_IPADDR ]; then
+  status LOCAL2; echo "----------------${STATUS}LAN2 configuration${NORM}---------------"
+  echo "IP Address   ${LOCAL2_IPADDR}"
+  echo "Netmask      ${LOCAL2_NETMASK}"
+fi
+
+if [ ! -z $LOCAL3_IPADDR ]; then
+  status LOCAL3; echo "----------------${STATUS}LAN3 configuration${NORM}---------------"
+  echo "IP Address   ${LOCAL3_IPADDR}"
+  echo "Netmask      ${LOCAL3_NETMASK}"
+fi
+
+if [ ! -z $LOCAL4_IPADDR ]; then
+  status LOCAL4; echo "----------------${STATUS}LAN4 configuration${NORM}---------------"
+  echo "IP Address   ${LOCAL4_IPADDR}"
+  echo "Netmask      ${LOCAL4_NETMASK}"
+fi
+
+if [ ! -z $WLAN_IPADDR ]; then
+  status WLAN; echo "----------------${STATUS}WLAN configuration${NORM}---------------"
+  echo "IP Address   ${WLAN_IPADDR}"
+  echo "Netmask      ${WLAN_NETMASK}"
+fi
+
+
+if [ ! -z $DMZ_IPADDR ]; then
+  status DMZ; echo "----------------${STATUS}DMZ configuration${NORM}----------------"
+  if [ ! -z ${DMZ_IPADDR2} ] || [ ! -z ${DMZ_IPADDR3} ]; then
+	echo "IP Address   ${DMZ_IPADDR} / ${DMZ_NETMASK}"
+  else
+	echo "IP Address   ${DMZ_IPADDR}"
+  fi
+  [ ! -z ${DMZ_IPADDR2} ] && echo "Secondary IP ${DMZ_IPADDR2} / ${DMZ_NETMASK2}"
+  [ ! -z ${DMZ_IPADDR3} ] && echo "Secondary IP ${DMZ_IPADDR3} / ${DMZ_NETMASK3}"
+  [ ! -z ${DMZ_IPADDR2} ] || [ ! -z ${DMZ_IPADDR3} ] || echo "Netmask      ${DMZ_NETMASK}"
+fi
+
+status WAN; echo "----------------${STATUS}DNS configuration${NORM}----------------"
+RESOLVFILE="/etc/resolv.conf"
+if [ "$USE_DNS_CACHE" = "YES" ] ; then
+	RESOLVFILE="/etc/resolv.dns"
+	echo "Using BrazilFW DNS Cache"
+fi
+cat $RESOLVFILE | grep domain
+cat $RESOLVFILE | grep nameserver
+echo "-------------------------------------------------"
+echo $UPTIME
+echo "-------------------------------------------------"
+IP_ERROR=0
+/usr/sbin/ip.test $1
+[ $? = 1 ]&&IP_ERROR=1
+echo "-------------------------------------------------"
+if [ $IP_ERROR != 0 ] ; then
+  echo ${RED}ERROR${NORM}: One or more IP addresses are conflicting
+fi
+if [ "${INET_UP}" != "UP" ] || [ "${LOCAL_UP}" != "UP" ] || [ ! -z "$DMZ_IPADDR" -a "${DMZ_UP}" != "UP" ]; then
+  echo "${RED}ERROR${NORM}: One or more of your network subsystems are down."
+fi

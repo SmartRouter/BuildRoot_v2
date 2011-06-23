@@ -1,0 +1,17 @@
+#!/bin/sh
+# 
+# Cron Starting Script
+# Claudio Roberto Cussuol - 09-24-2004
+#
+
+. /etc/coyote/coyote.conf
+if [ "$ENABLE_CRON" = "YES" ] ; then
+  which crond > /dev/null 2> /dev/null
+  if [ $? = 0 ] ; then
+    echo "Starting cron"
+    logger "Starting cron"
+    crond
+  else
+    ERROR: Cron is not installed and could not be started
+  fi
+fi

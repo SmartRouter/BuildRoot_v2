@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# List Layer7 Filter Protocols Script for Coyote Linux
+# Author:  Claudio Roberto Cussuol  
+#          29/05/2005
+#
+
+ls /etc/l7-protocols/*.pat > /dev/null 2> /dev/null
+if [ $? = 0 ] ; then
+  cd /etc/l7-protocols
+  ls *.pat | sed s/.pat//g
+fi

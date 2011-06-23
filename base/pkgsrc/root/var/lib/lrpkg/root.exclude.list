@@ -1,0 +1,13 @@
+dev
+mnt
+proc
+tmp
+linuxrc.err
+etc/mtab
+usr/tmp
+var/lock
+var/run
+var/tmp
+var/lib/lrpkg/boot.fstype
+var/lib/lrpkg/packages
+var/lib/lrpkg/mnt

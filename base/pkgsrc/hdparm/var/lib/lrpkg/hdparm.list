@@ -1,0 +1,3 @@
+/sbin/hdparm
+/etc/rc.d/pkgs/mod.hdparm
+/var/lib/lrpkg/hdparm.list

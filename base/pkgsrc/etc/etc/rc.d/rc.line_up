@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# Coyote Line UP Startup Script
+#
+# Author: Claudio Roberto Cussuol - 08/09/2004
+
+. /etc/coyote/coyote.conf
+# Reload dnsmasq due posible changes to dns servers
+if [ "$INETTYPE" != "ETHERNET_STATIC" ] ; then
+  [ -x /etc/rc.d/rc.dnsmasq ] && /etc/rc.d/rc.dnsmasq $1
+fi  
+# Reload Load Balance
+[ "$LOAD_BALANCE" = "YES" ] && /etc/rc.d/rc.loadbalance
+# Reload firewall rules
+[ -x /etc/rc.d/rc.firewall ] && /etc/rc.d/rc.firewall $1
+# Reload QOS
+[ -x /etc/rc.d/rc.qos ] && /etc/rc.d/rc.qos

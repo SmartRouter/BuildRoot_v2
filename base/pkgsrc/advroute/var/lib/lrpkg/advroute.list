@@ -1,0 +1,5 @@
+/lib/modules/advroute
+/etc/modules.advroute
+/etc/rc.d/pkgs/mod.advroute
+/bin/vconfig
+/var/lib/lrpkg/advroute.list

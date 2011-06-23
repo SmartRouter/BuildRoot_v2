@@ -1,0 +1,469 @@
+#!/bin/sh
+
+INSTDIR='/tmp/install'
+BFW_SOURCE="/mnt"
+
+check_yn() {
+  YN=""
+  while [ "$YN" = "" ]; do
+    echo -n "$@"
+    read YN
+    [ "$YN" = "y" ] && YN="Y"
+    [ "$YN" = "n" ] && YN="N"
+    [ "$YN" = "Y" ] || [ "$YN" = "N" ] || YN=""
+  done
+}
+
+abort() {
+  umount $INSTDIR > /dev/null 2> /dev/null
+  rm -rf $INSTDIR
+  umount /mnt > /dev/null 2> /dev/null
+  echo
+  echo "Instalation Aborted. Press [ENTER]"
+  echo
+  read junk
+  exit
+}
+
+echo "BRAZILFW INSTALLER"
+echo "=================="
+echo
+echo "http://www.brazilfw.com.br"
+echo
+echo "Attention !!!"
+echo
+echo "This software will partition and format your hard disk."
+echo "If you go on any data stored on it will be permanently destroyed."
+echo "I'm not responsible for any data loss or hardware damage."
+echo "USE IT AT YOUR OWN RISK."
+echo
+echo
+
+check_yn "Do you want to go ahead ? (y/n) - "
+[ "$YN" = "N" ] && abort
+
+umount $INSTDIR > /dev/null 2> /dev/null
+rm -rf $INSTDIR
+mkdir  $INSTDIR
+mount tmpfs $INSTDIR -t tmpfs -o size=32M
+
+echo "Reading the install media..."
+. /tmp/boot.info
+mount -o ro $DEVICE /mnt -t $FSTYPE > /dev/null 2> /dev/null
+if [ $? != 0 ] ; then
+  echo "Error trying to read the install media."
+  abort
+fi
+
+for F in `ls /mnt/*.tgz`; do
+  F=`basename $F .tgz`
+  echo $F >> $INSTDIR/pkg.list
+done
+
+echo
+echo "Please wait. Reading BrazilFW files..."
+mkdir $INSTDIR/temp
+mkdir $INSTDIR/temp/config
+cp ${BFW_SOURCE}/*.tgz        $INSTDIR/temp        1> /dev/null 2> /dev/null
+cp ${BFW_SOURCE}/brazilfw.dpy $INSTDIR/temp        1> /dev/null 2> /dev/null
+cp ${BFW_SOURCE}/syslinux.cfg $INSTDIR/temp        1> /dev/null 2> /dev/null
+cp ${BFW_SOURCE}/linux        $INSTDIR/temp        1> /dev/null 2> /dev/null
+cp -a ${BFW_SOURCE}/config/*  $INSTDIR/temp/config 1> /dev/null 2> /dev/null
+
+umount /mnt 1> /dev/null 2> /dev/null
+
+hd=
+iface=
+size=
+upgrade=no
+format=yes
+upgrade_addons=no
+have_addons=no
+have_obsolete=no
+use_cache=no
+mbs=
+mbs_cache=
+
+echo "Detecting your Hard Disks..."
+echo
+echo
+hds=`detecthds | wc -l`
+
+treatline() {
+  type=`echo $LINE | cut -f 1 -d "#"`
+  hd=`echo $LINE | cut -f 2 -d "#"`
+  model=`echo $LINE | cut -f 3 -d "#"`
+  size=`echo $LINE | cut -f 4 -d "#"`
+  cyl=`echo $LINE | cut -f 5 -d "#"`
+  head=`echo $LINE | cut -f 6 -d "#"`
+  sect=`echo $LINE | cut -f 7 -d "#"`
+  case $hd in
+    hda) iface="Primary Master";;
+    hdb) iface="Primary Slave";;
+    hdc) iface="Secondary Master";;
+    hdd) iface="Secondary Slave";;
+    sda) iface="First Device";;
+    sdb) iface="Second Device";;
+    sdc) iface="Third Device";;
+    sdd) iface="Fourth Device";;
+    sde) iface="Fifth Device";;
+    *) iface="Unknow";;
+  esac
+}
+showhd() {
+  echo $number")" $type - $iface - $size MB
+  echo $model
+  echo
+}
+
+if [ $hds = 0 ] ; then
+  echo "There isn't any hard disk installed in this computer"
+  echo "If you plugged one already check the cables and be sure"
+  echo "it was detected by the BIOS."
+  echo
+  abort
+fi
+if [ $hds = 1 ] ; then
+  LINE=`detecthds`
+  treatline
+  number=1
+  showhd
+fi
+if [ $hds -gt 1 ] ; then
+  number=0
+  detecthds | while read LINE ; do
+    number=$(($number+1))
+    treatline
+    showhd
+  done
+
+  voltar=1
+  while [ "$voltar" = 1 ] ; do
+    echo -n "Choose the hard disk you want to install the BrazilFW: "
+    read junk
+    numb=0
+    LINE=
+    echo -n > $INSTDIR/line
+    detecthds | while read LINE ; do
+      numb=$((numb+1))
+      [ "$numb" = "$junk" ] && echo $LINE > $INSTDIR/line
+    done
+    LINE=`cat $INSTDIR/line`
+    [ -n "$LINE" ] && voltar=0
+    treatline
+  done
+
+  echo
+  echo You choose:
+  showhd
+fi
+
+check_yn "Are you sure you want to install the BrazilFW to this Hard Disk ? (y/n) - "
+[ "$YN" = "N" ] && abort
+
+device="/dev/$hd"
+partition="$device"1
+
+echo
+echo "Trying to detect an upgradable previous version of BrazilFW Linux"
+echo
+echo "It is normal to see some error messages here, they mean only"
+echo "this HD does not have any previous BrazilFW version on it"
+echo
+mount $partition /mnt -t vfat > /dev/null 2> /dev/null
+if [ $? = 0 ] ; then
+  version=
+  if [ -e "/mnt/config/coyote.cfg" ]; then
+       if [ -e "/mnt/brazilfw.dpy" ]; then
+          version="v"`cat /mnt/brazilfw.dpy | grep -i "^BrazilFW" | sed s/[^0123456789.]//g`
+     elif [ -e "/mnt/syslinux.dpy" ]; then
+          version="v"`cat /mnt/syslinux.dpy | grep -i "^BrazilFW" | sed s/[^0123456789.]//g`
+       fi
+  fi
+  if [ -n '$version' ] ; then
+    echo
+    echo BrazilFW Linux Version found: $version
+    echo
+    echo "This hard disk contains an upgradable version of BrazilFW Linux"
+    echo "you can upgrade it and keep your configurations"
+    echo
+    check_yn "Do you want to upgrade this instalation ? (y/n) - "
+    if [ "$YN" = "Y" ] ; then
+      echo
+      echo
+      echo "Now you can choose if you want to format this disk again or just"
+      echo "upgrade the system files preserving your logs and cache."
+      echo "  If you want to preserve the data on second partition you should not format it"
+      echo "  If you want to change the size of current partitions you must format it"
+      echo
+      check_yn "Do you want to format this disk again ? (y/n) - "
+      [ "$YN" = "N" ] && format=no
+
+      echo
+      echo "Saving current configurations..."
+      mkdir $INSTDIR/upgrade
+      cp -a /mnt/config/* $INSTDIR/upgrade
+      [ -e /mnt/ssh_keys.tgz ] && cp /mnt/ssh_keys.tgz $INSTDIR
+      rm -rf $INSTDIR/upgrade/language.gz
+      echo "Done."
+      echo
+      upgrade=yes
+
+      echo "Looking for obsolete add-ons"
+      for F in `ls /mnt/*.tgz`; do
+        F=`basename $F .tgz`
+        if [ -n "`grep $F /var/lib/lrpkg/addons.obsolete`" ] ; then
+          echo $F >> $INSTDIR/pkg.list3
+          have_obsolete=yes
+        fi
+      done
+      if [ "$have_obsolete" = "yes" ] ; then
+        echo
+        echo "The following obsolete add-ons were found on current instalation"
+        echo "and will be DELETED."
+        cat $INSTDIR/pkg.list3
+        echo
+        read junk
+      else
+        touch $INSTDIR/pkg.list3
+      fi
+
+      echo "Looking for upgradable add-ons"
+      for F in `ls /mnt/*.tgz`; do
+        F=`basename $F .tgz`
+        if [ -z "`grep $F $INSTDIR/pkg.list`" -a -z "`grep $F $INSTDIR/pkg.list3`" ] ; then
+          echo $F >> $INSTDIR/pkg.list2
+          have_addons=yes
+        fi
+      done
+      if [ "$have_addons" = "yes" ] ; then
+        echo
+        echo "The following upgradable add-ons were found on current instalation"
+        cat $INSTDIR/pkg.list2
+        echo
+        check_yn "Do you want to keep them ? (y/n) - "
+        if [ "$YN" = "Y" ] ; then
+          mkdir $INSTDIR/oldpacks
+          cat $INSTDIR/pkg.list2 | while read f; do
+            cp /mnt/$f.tgz $INSTDIR/oldpacks
+          done
+          echo "Done."
+          echo
+          upgrade_addons=yes
+        fi
+      fi
+    fi
+  fi
+fi
+umount /mnt  > /dev/null 2> /dev/null
+
+if [ "$format" = "yes" ] ; then
+  min_part=$(($head * $sect / 2048))
+
+  echo $iface - $showsize MB
+  echo $model
+  sfdisk -g $device
+  echo
+
+  default_mbs=40
+  [ $size -lt $default_mbs ] && default_mbs=$size
+  while [ "$mbs" = "" ] ; do
+    echo
+    echo -n "Set the size of partition to create in Megabytes (default=$default_mbs MB) : "
+    read junk
+    [ -z "$junk" ] && mbs=$default_mbs
+    [ -n "$junk" ] && mbs=$junk
+    if [ "$mbs" -lt 8 ] ; then
+      echo "Too little. Set at least 8 Megabytes"
+      mbs=
+    elif [ "$mbs" -lt $min_part ] ; then
+      echo "Too little. The smaller partition for this hd is $min_part Megabytes"
+      mbs=
+    elif [ "$mbs" -gt 1000 ] ; then
+      echo "Too big. Set at most 1000 Megabytes"
+      mbs=
+    elif [ "$mbs" -gt $size ] ; then
+      echo "Too big. The hd has only $size Megabytes"
+      mbs=
+    fi
+  done
+
+  echo
+  echo If you are planning to install some proxy cache to this
+  echo BrazilFW you can create a second partition using the
+  echo rest of this HD.
+  echo
+  check_yn "Do you want to create a second partition ? (y/n) - "
+  [ "$YN" = "Y" ] && use_cache=yes
+
+  if [ "$use_cache" = "yes" ] ; then
+    cyl_first=$((($mbs*1024*1024)/($head*$sect*512)))
+    cyl_remaining=$(($cyl-$cyl_first))
+    default_mbs_cache=$(($cyl_remaining*$head*$sect/2048))
+
+    while [ "$mbs_cache" = "" ] ; do
+      echo
+      echo -n "Set the size of partition to create in Megabytes (default=$default_mbs_cache MB) : "
+      read junk
+      [ -z "$junk" ] && mbs_cache=$default_mbs_cache
+      [ -n "$junk" ] && mbs_cache=$junk
+      if [ "$mbs_cache" -lt 3 ] ; then
+        echo "Too little. Set at least 3 Megabytes"
+       	mbs_cache=
+      elif [ "$mbs_cache" -lt $min_part ] ; then
+        echo "Too little. The smaller partition for this hd is $min_part Megabytes"
+        mbs_cache=
+      elif [ "$mbs_cache" -gt $default_mbs_cache ] ; then
+        echo "Too big. The hd has only $default_mbs_cache Megabytes remaining"
+        mbs_cache=
+      fi
+    done
+  fi
+fi
+
+if [ "$format" = "yes" ] ; then
+  echo "ATTENTION !!!"
+  echo
+  echo "This hard disk will be partitioned and formated now."
+  echo "If you go on any data stored on it will be permanently destroyed."
+  echo
+  check_yn "Are you sure you want to do this ? (y/n) - "
+  [ "$YN" = "N" ] && abort
+
+  echo
+  echo Cleaning MBR...
+  dd if=/bin/clean.mbr of=$device count=1
+  if [ "$?" != 0 ] ; then
+    echo "Error Cleaning MBR"
+    abort
+  fi
+
+  cyl=$((($mbs*1024*1024)/($head*$sect*512)))
+  command="0,$cyl,b,*"
+
+  if [ "$use_cache" = "yes" ] ; then
+    partition_cache="$device"2
+    cyl_cache=$((($mbs_cache*1024*1024)/($head*$sect*512)))
+    command="$command\n,$cyl_cache,83,"
+  fi
+
+  echo
+  echo $command
+
+  echo
+  echo Partitioning...
+  #echo -e $command | sfdisk -q -uM $device  #Particiona em megabytes ao invés de cilindros.
+  echo -e $command | sfdisk -q $device
+  if [ "$?" != 0 ] ; then
+    echo "Error Partitioning"
+    abort
+  fi
+
+  echo
+  echo Creating DOS file system...
+  mkdosfs $partition
+  if [ "$?" != 0 ] ; then
+    echo "Error Creating DOS file system"
+    abort
+  fi
+
+  if [ "$use_cache" = "yes" ] ; then
+    echo
+    echo Creating Linux file system on second partition...
+    /bin/mke2fs -q -F -m 0 -s 1 $partition_cache
+    if [ "$?" != 0 ] ; then
+      echo "Error Creating LINUX file system on second partition"
+      abort
+    fi
+  fi
+else
+  echo "READY TO GO !!!"
+  echo "This system will be upgraded now."
+  echo
+  check_yn "Are you sure you want to do this ? (y/n) - "
+  [ "$YN" = "N" ] && abort
+fi
+
+echo
+echo Installing Boot Loader...
+syslinux -s $partition
+if [ "$?" != 0 ] ; then
+  echo "Error installing Syslinux"
+  abort
+fi
+
+echo
+echo Mounting the new partition
+mount -t vfat $partition /mnt
+if [ "$?" != 0 ] ; then
+  echo "Error mounting new partition"
+  abort
+fi
+
+sync
+
+echo
+echo Copying Files. Please wait...
+if [ "$upgrade_addons" = "yes" ] ; then
+  cp $INSTDIR/oldpacks/* /mnt 1> /dev/null 2> /dev/null
+else
+  [ -e $INSTDIR/pkg.list2 ] && cat $INSTDIR/pkg.list2 | while read f; do
+    [ -n "$f" ] && rm -rf /mnt/$f.tgz
+  done
+fi
+if [ "$have_obsolete" = "yes" ] ; then
+  [ -e $INSTDIR/pkg.list3 ] && cat $INSTDIR/pkg.list3 | while read f; do
+    [ -n "$f" ] && rm -rf /mnt/$f.tgz
+  done
+fi
+
+cp $INSTDIR/temp/* /mnt 1> /dev/null 2> /dev/null
+mkdir /mnt/config 1> /dev/null 2> /dev/null
+cp -a $INSTDIR/temp/config/* /mnt/config 1> /dev/null 2> /dev/null
+if [ "$upgrade" = "yes" ] ; then
+  cp -a $INSTDIR/upgrade/* /mnt/config 1> /dev/null 2> /dev/null
+  [ -e $INSTDIR/ssh_keys.tgz ] && cp $INSTDIR/ssh_keys.tgz /mnt
+fi
+sync
+
+umount $INSTDIR > /dev/null 2> /dev/null
+rm -rf $INSTDIR
+umount /mnt
+
+echo Done.
+
+if [ "$use_cache" = "yes" ] ; then
+  echo
+  echo Mounting the second partition
+  mount -t ext2 $partition_cache /mnt
+  if [ "$?" != 0 ] ; then
+    echo "Error mounting second partition"
+    abort
+  fi
+
+  echo
+  echo Creating Linux journaling on second partition ...
+  /bin/tune2fs -c 0 -i 0 -j -O dir_index $partition_cache
+  if [ "$?" != 0 ] ; then
+    echo "Error Creating Linux journaling on second partition ..."
+    abort
+  fi
+  umount /mnt > /dev/null 2> /dev/null
+
+  echo
+  echo "Indexing directories (htree) ..."
+  /bin/e2fsck -yfD $partition_cache
+  echo
+fi
+
+echo
+echo "Your instalation is done."
+echo
+echo "Remove any instalation CD from your drives"
+echo "Set the BIOS to boot from device installed on $iface"
+echo
+check_yn "Reboot the system now ? (y/n) - "
+if [ "$YN" = "Y" ] ; then
+  touch /tmp/reboot
+  reboot
+fi

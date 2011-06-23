@@ -1,0 +1,12 @@
+coyote.cfg coyote.conf
+firewall.cfg firewall
+portfw.cfg portforwards
+fireloc.cfg firewall.local
+qosfilt.cfg qos.filters
+qosclass.cfg qos.classes
+hosts.dns ../hosts.dns
+reserve.cfg ../dhcpd.reservations
+cron.cfg ../../var/spool/cron/crontabs/root
+subnet.cfg subnet.cfg
+dnsmasq.cfg ../dnsmasq.conf.template
+rclocal.cfg ../rc.d/rc.local

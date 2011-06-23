@@ -1,0 +1,6 @@
+/etc/rc.d/pkgs/rc.webadmin
+/usr/sbin/thttpd
+/usr/bin/proccgi
+/usr/bin/cryptpw
+/var/lib/lrpkg/webadmin.*
+/var/http

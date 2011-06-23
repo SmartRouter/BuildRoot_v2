@@ -1,0 +1,4 @@
+/lib/modules/drivers
+/etc/modules.drivers
+/etc/rc.d/pkgs/mod.drivers
+/var/lib/lrpkg/drivers.list

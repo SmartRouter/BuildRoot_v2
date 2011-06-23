@@ -1,0 +1,6 @@
+#!/bin/sh
+#
+# Squelches startup message about missing files
+
+echo "Running package startup scripts..."
+

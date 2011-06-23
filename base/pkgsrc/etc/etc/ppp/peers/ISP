@@ -1,0 +1,3 @@
+ttyS0 115200 crtscts
+user 'josh' connect '/usr/sbin/chat -v -f /etc/ppp/isp.chat'
+noauth

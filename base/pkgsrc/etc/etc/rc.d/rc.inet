@@ -1,0 +1,313 @@
+#!/bin/sh
+# Coyote INET Startup Script
+# Author: Joshua Jackson <jjackson@vortech.net>
+# Changed to support others LAN interfaces
+# Changed to support Load Balance by IP Alias interfaces in IF_INET
+# by BFW user "marcos do vale" - 12/09/2007
+
+[ -r /tmp/netsubsys.state ] && rm -f /tmp/netsubsys.state
+[ -r /tmp/ready ] && rm -f /tmp/ready
+[ -e /tmp/realdns* ] && rm -rf /tmp/realdns*
+
+[ -n "$MAX_CONNTRACK" ] && echo $MAX_CONNTRACK > /proc/sys/net/ipv4/ip_conntrack_max
+
+[ -e /etc/ppp/pap-secrets ] && rm -rf /etc/ppp/pap-secrets
+
+# Set the interfaces to use for Internet / Internal Networks
+[ -z "$IF_LOCAL" ] && IF_LOCAL=eth0
+
+if [ -z "$IF_INET" ]; then
+ if [ "$INETTYPE" != "PPPOE" ] || ip link set eth1 mtu 1500 >/dev/null 2>&1; then
+	IF_INET=eth1
+ else
+ 	IF_INET=$IF_LOCAL
+ fi
+fi
+
+if [ -n "$DMZ_IPADDR" ] ; then
+ if [ -z "$IF_DMZ" ]; then
+ 	[ "$INETTYPE" = "PPP" ] && IF_DMZ=eth1 || IF_DMZ=eth2
+ fi
+ DMZ_UP=DOWN
+fi
+
+INET_UP=DOWN
+LOCAL_UP=DOWN
+
+. /usr/sbin/write_state.sh
+
+if [ -n "$MAC_SPOOFING" ]; then
+	echo "Setting up MAC address $MAC_SPOOFING on $IF_INET ..."
+	ifconfig $IF_INET hw ether $MAC_SPOOFING
+fi
+
+# Set the hostname
+[ -z "$HOSTNAME" -a -n "$DHCPHOSTNAME" ] && HOSTNAME="$DHCPHOSTNAME"
+[ -z "$HOSTNAME" ] && HOSTNAME="brazilfw"
+hostname $HOSTNAME
+
+# Set the domainname
+[ -z "$DOMAINNAME" -a -n "$DHCPD_DOMAIN" ] && DOMAINNAME="$DHCPD_DOMAIN"
+[ -z "$DOMAINNAME" ] && DOMAINNAME="localdomain"
+
+# Set the idle connection timeout to 1 hour
+echo 3600 > /proc/sys/net/ipv4/netfilter/ip_conntrack_tcp_timeout_established
+
+# Some additional IP security tweaks
+echo 1 > /proc/sys/net/ipv4/icmp_ignore_bogus_error_responses
+echo 1 > /proc/sys/net/ipv4/icmp_echo_ignore_broadcasts
+for i in /proc/sys/net/ipv4/conf/*; do
+ echo 0 > $i/send_redirects
+ echo 0 > $i/accept_redirects
+ echo 1 > $i/secure_redirects
+ echo 0 > $i/accept_source_route
+ echo 0 > $i/bootp_relay
+ echo 0 > $i/proxy_arp
+done
+
+# Clear existing firewall rule sets
+iptables -F
+iptables -t nat -F
+iptables -X
+iptables -t nat -X
+
+# Create the Simplified Firewall rulesets
+iptables -N user-filter
+iptables -N port-filter
+iptables -t mangle -N l7-filter
+iptables -t mangle -N Subnet_qos
+iptables -I FORWARD -j port-filter
+iptables -I FORWARD -j user-filter
+iptables -t mangle -I POSTROUTING -j Subnet_qos
+iptables -t mangle -I POSTROUTING -j l7-filter
+
+# Create the port-forward rulesets
+iptables -N autofw-acl
+iptables -N portfw-acl
+iptables -N access-acl
+iptables -t nat -N subnets-masks
+iptables -t nat -N nat-masks
+iptables -t nat -N auto-forward
+iptables -t nat -N port-forward
+iptables -t nat -N nat-acl
+iptables -t nat -N dns-preroute
+iptables -t nat -N dns-postroute
+
+iptables -I FORWARD -j portfw-acl
+iptables -I FORWARD -j autofw-acl
+iptables -t nat -I PREROUTING -j port-forward
+iptables -t nat -I PREROUTING -j auto-forward
+iptables -t nat -I PREROUTING -j dns-preroute
+iptables -t nat -I PREROUTING -j nat-acl
+iptables -t nat -I POSTROUTING -j dns-postroute
+iptables -t nat -I POSTROUTING -j nat-masks
+iptables -t nat -I POSTROUTING -j subnets-masks
+
+# Create the remote administration rule
+iptables -N remote-admin
+iptables -I INPUT -j remote-admin
+iptables -A INPUT -j user-filter
+
+# Create Interface Filtering rulesets
+iptables -N if-filter
+iptables -N log-and-drop
+
+# Accept Established Connections
+iptables -I INPUT -m state --state INVALID -j DROP
+iptables -I INPUT -m state --state established,related -j ACCEPT
+iptables -I FORWARD -m state --state INVALID -j DROP
+iptables -I FORWARD -m state --state established,related -j ACCEPT
+
+# Access Control, moved to here to block even established connections
+iptables -I FORWARD -j access-acl
+
+# Bring up the loopback interface
+ip link set lo up
+ip addr add 127.0.0.1/8 dev lo
+
+cfg_eth() {
+ echo "Configuring $4 Network Interface..."
+ eval `ipcalc -p $1 $2`
+ ip link set $3 up
+ [ -z `echo $3 | grep :` ] && ip addr add $1/$PREFIX brd + dev $3 || \
+ { DEV=`echo $3 | grep : | cut -f1 -d:`; ip addr add $1/$PREFIX brd + dev $DEV label $3; }
+ [ $? -eq 0 ] && return 0 || { echo "The $4 Network Interface Card was not set properly";
+ logger "The $4 Network Interface Card was not set properly"; }
+}
+
+# Configure the network adapters
+cfg_eth $LOCAL_IPADDR $LOCAL_NETMASK $IF_LOCAL "1st Local"
+if [ $? = "0" ]; then
+ LOCAL_UP=UP
+ [ ! -z $LOCAL_IPADDR2 ] && cfg_eth $LOCAL_IPADDR2 $LOCAL_NETMASK2 $IF_LOCAL "2nd IP in 1st Local"
+ [ ! -z $LOCAL_IPADDR3 ] && cfg_eth $LOCAL_IPADDR3 $LOCAL_NETMASK3 $IF_LOCAL "3rd IP in 1st Local"
+fi
+
+# Configure the LAN2 network
+if [ ! -z $LOCAL2_IPADDR ]; then
+ LOCAL2_UP=DOWN
+ cfg_eth $LOCAL2_IPADDR $LOCAL2_NETMASK $IF_LOCAL2 "2nd Local"
+ [ $? = 0 ] && LOCAL2_UP=UP
+fi
+
+# Configure the LAN3 network
+if [ ! -z $LOCAL3_IPADDR ]; then
+ LOCAL3_UP=DOWN
+ cfg_eth $LOCAL3_IPADDR $LOCAL3_NETMASK $IF_LOCAL3 "3rd Local"
+ [ $? = 0 ] && LOCAL3_UP=UP
+fi
+
+# Configure the LAN4 network
+if [ ! -z $LOCAL4_IPADDR ]; then
+ LOCAL4_UP=DOWN
+ cfg_eth $LOCAL4_IPADDR $LOCAL4_NETMASK $IF_LOCAL4 "4th Local"
+ [ $? = 0 ] && LOCAL4_UP=UP
+fi
+
+# Configure the DMZ network
+if [ ! -z $DMZ_IPADDR ]; then
+ DMZ_UP=DOWN
+ cfg_eth $DMZ_IPADDR $DMZ_NETMASK $IF_DMZ DMZ
+ if [ $? = 0 ]; then
+	DMZ_UP=UP
+	[ ! -z $DMZ_IPADDR2 ] && cfg_eth $DMZ_IPADDR2 $DMZ_NETMASK2 $IF_DMZ "2nd IP in DMZ"
+	[ ! -z $DMZ_IPADDR3 ] && cfg_eth $DMZ_IPADDR3 $DMZ_NETMASK3 $IF_DMZ "3rd IP in DMZ"
+ fi
+fi
+
+# Configure the WLAN network
+if [ ! -z $WLAN_IPADDR ]; then
+ WLAN_UP=DOWN
+ cfg_eth $WLAN_IPADDR $WLAN_NETMASK $IF_WLAN WLAN
+ [ $? = 0 ] && WLAN_UP=UP
+fi
+
+# Configure the INET2 network
+if [ ! -z $INET2_IPADDR ]; then
+ INET2_UP=DOWN
+ cfg_eth $INET2_IPADDR $INET2_NETMASK $IF_INET2 "2nd Internet"
+ [ $? = 0 ] && INET2_UP=UP
+fi
+
+# Configure the INET3 network
+if [ ! -z $INET3_IPADDR ]; then
+ INET3_UP=DOWN
+ cfg_eth $INET3_IPADDR $INET3_NETMASK $IF_INET3 "3rd Internet"
+ [ $? = 0 ] && INET3_UP=UP
+fi
+
+# Configure the INET4 network
+if [ ! -z $INET4_IPADDR ]; then
+ INET4_UP=DOWN
+ cfg_eth $INET4_IPADDR $INET4_NETMASK $IF_INET4 "4th Internet"
+ [ $? = 0 ] && INET4_UP=UP
+fi
+
+USEDYNADDR=YES
+
+. /usr/sbin/write_state.sh
+
+[ -n "$DNS1" ] && echo "$DNS1" > /tmp/realdns1
+[ -n "$DNS2" ] && echo "$DNS2" > /tmp/realdns2
+[ -n "$DNS3" ] && echo "$DNS3" > /tmp/realdns3
+
+# The system loggers need to be started after the network in case remote
+# logging is needed
+syslogd $SYSLOG_OPTS
+klogd
+
+if [ "$LOCAL_UP" = "UP" -o "$ENABLE_EXTERNAL_SSH" != "NO" ]; then
+ echo "Starting SSH daemon..."
+ [ -z "$SSH_PORT" ] && SSH_PORT=22
+ /usr/sbin/sshd -p $SSH_PORT
+ /etc/rc.d/rc.dnsmasq
+fi
+
+case "$INETTYPE" in
+
+ "ETHERNET_DHCP")
+	# Attempt to configure the Internet interface with DHCP if so configured
+	# DHCP Assigned Internet Address
+	. /etc/rc.d/rc.dhcp
+	. /usr/sbin/write_state.sh
+	echo 1 > /proc/sys/net/ipv4/ip_dynaddr
+ ;;
+ "ETHERNET_STATIC")
+	echo "Setting up Static Address Internet connection..."
+	# Static IP Address
+	USEDYNADDR=NO
+	cfg_eth $IPADDR $NETMASK $IF_INET Internet
+	if [ $? = 0 ]; then
+		INET_UP=UP
+		[ ! -z $IPADDR2 ] && cfg_eth $IPADDR2 $NETMASK2 $IF_INET "2nd IP in Internet"
+		[ ! -z $IPADDR3 ] && cfg_eth $IPADDR3 $NETMASK3 $IF_INET "3rd IP in Internet"
+	fi
+
+	ip route add 0.0.0.0/0 via $GATEWAY
+	if [ $? = 0 ]; then
+		INET_UP=UP
+	else
+		INET_UP=DOWN
+		echo "The Internet Network Interface Card was not set properly"
+		logger "The Internet Network Interface Card was not set properly"
+	fi
+	. /usr/sbin/write_state.sh
+	[ "$LOCAL_UP" = "UP" ] && . /etc/rc.d/rc.line_up
+ ;;
+ "PPPOE")
+	# PPPoE Support
+	echo "Setting up PPPoE Internet connection..."
+	# rc.pppoe is responsible for setting INET_UP status
+	. /etc/rc.d/rc.pppoe
+	. /usr/sbin/write_state.sh
+	echo 1 > /proc/sys/net/ipv4/ip_dynaddr
+ ;;
+ "PPP")
+	echo "Setting up PPP Internet connection..."
+	# Dialup PPP Sharing
+	. /etc/rc.d/rc.ppp
+	. /usr/sbin/write_state.sh
+	echo 1 > /proc/sys/net/ipv4/ip_dynaddr
+ ;;
+ *)
+	echo "-------------------- !! ERROR !! ---------------------"
+	echo " This copy of BrazilFW is not properly configured "
+	echo
+	echo " No valid Internet Connection type has been specified "
+	echo "------------------------------------------------------"
+ ;;
+esac
+
+# Enable kernel level IP forwarding
+echo 1 > /proc/sys/net/ipv4/ip_forward
+
+touch /tmp/ready
+
+if [ "$INETTYPE" != "ETHERNET_STATIC" ]; then
+ echo "Giving PPPoE or DHCP a chance to go up"
+ sleep 5
+ . /tmp/netsubsys.state	# Reload status
+fi
+
+NET_OK=YES
+[ "$INET_UP" = "READY" ] && NET_OK=READY
+[ "$INET_UP" = "DOWN" ] && NET_OK=NO
+[ "$LOCAL_UP" = "DOWN" ] && NET_OK=NO
+[ -n "$DMZ_IPADDR" -a "$DMZ_UP" = "DOWN" ] && NET_OK=NO
+
+if [ "$NET_OK" = "NO" ]; then
+ echo "----------------------------------------------------------------"
+ echo "ERROR: One or more network subsystems failed to start."
+ echo
+ echo "LAN network: $LOCAL_UP"
+ echo "WAN network: $INET_UP"
+ [ -n "$DMZ_IPADDR" ] && echo "DMZ network: $DMZ_UP"
+ echo "----------------------------------------------------------------"
+ echo -e -n "\a"
+ sleep 2
+fi
+if [ "$NET_OK" = "READY" ]; then
+ echo "----------------------------------------------------------------"
+ echo "ATTENTION : Your internet interface is not connected now."
+ echo "----------------------------------------------------------------"
+fi

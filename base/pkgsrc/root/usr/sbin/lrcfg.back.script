@@ -1,0 +1,34 @@
+#!/bin/sh
+#
+# Coyote Linux Backup Script
+#
+# Based on original from Linux Router Project
+
+if [ $# -ne 2 ]; then
+	echo "Bad call to $(basename $0)"
+	exit 1
+fi
+
+LRPKG="/var/lib/lrpkg"
+MNT="$LRPKG/mnt"
+
+PACKAGE="$1"
+WTMP="$2"
+INCLUDE="/var/lib/lrpkg/$PACKAGE.list"
+EXCLUDE="/tmp/EXCLUDE"
+
+DIR="$MNT"
+
+mv $INCLUDE /tmp/tmp.list >/dev/null 2>&1
+cat /var/lib/lrpkg/*.list >$EXCLUDE 
+mv /tmp/tmp.list $INCLUDE >/dev/null 2>&1
+
+echo -n "Creating $PACKAGE.tgz Please wait: "
+
+cd /
+ctar `cat $INCLUDE` -X `cat $EXCLUDE` | gzip - >$DIR/$PACKAGE.tgz
+
+rm $EXCLUDE
+
+sync
+exit 0

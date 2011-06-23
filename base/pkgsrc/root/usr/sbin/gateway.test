@@ -1,0 +1,49 @@
+#!/bin/sh
+#
+# Gateway test to coyote linux
+#
+# Claudio Roberto Cussuol # 19/06/2004
+# Fixed by Frederick Henderson
+
+. /etc/coyote/coyote.conf
+. /tmp/netsubsys.state
+
+
+GW="0.0.0.0"
+
+if [ "$INET_UP" != "UP" ] ; then
+  echo Your internet link is not connected
+  exit 1
+else
+  if [ "$INETTYPE" = "PPP" -o "$INETTYPE" = "PPPOE" ] ; then
+    IF_INET=ppp0
+    GATEWAY=`ifconfig ppp0 | grep P-t-P`
+    GATEWAY=`echo $GATEWAY | cut -f 3 -d " "`
+    GATEWAY=`echo $GATEWAY | cut -f 2 -d :`
+  elif [ "$INETTYPE" = "ETHERNET_DHCP" ] ; then
+    . /etc/dhcpc/$IF_INET.info
+    GATEWAY=$dhcp_router
+  fi
+  GW=$GATEWAY
+
+# GW=`route | grep default | sed s/\ */#/g | cut -f 3 -d "#"`
+# GW=`ip route show | grep default | cut -f 3 -d ' '`
+
+  if [ $? = 0 -a -n "$GW" ] ; then
+    echo "Trying to ping your gateway:$GW"
+    echo	
+    ping -c 1 $GW 
+    if [ $? = 0 ] ; then
+      echo
+      echo "Your gateway is RESPONDING"
+      exit 0	
+    else
+      echo
+      echo "Your gateway is NOT RESPONDING"
+      exit 1
+    fi
+  else
+    echo Unable to get your gateway address
+    exit 1
+  fi
+fi

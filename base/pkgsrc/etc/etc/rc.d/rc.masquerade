@@ -1,0 +1,183 @@
+#!/bin/sh
+# Coyote Masquerading Startup Script
+#	called by: /etc/rc.d/rc.firewall
+# Changed to support others LAN interfaces
+# by BFW user "marcos do vale" - 10/09/2007
+# Expects the external (Internet) interface to be passed as the first parameter
+#
+# Sintaxe:
+# auto protocol port dest_ip dns
+# port dest_ip internet_ip protocol port1 port2 dns
+
+[ -z "$CONFIG_LOADED" ] && . /etc/coyote/coyote.conf
+
+if [ ! -z "$1" ]; then
+ IF_INET=$1
+ logger "Coyote Masquerading Script called with: $IF_INET"
+else
+ if [ "$INETTYPE" = "PPPOE" -o "$INETTYPE" = "PPP" ]; then
+	IF_INET=ppp0
+ elif [ -z "$IF_INET" ]; then
+	IF_INET=eth1
+ fi
+ logger "Coyote Masquerading Script started with default: $IF_INET"
+fi
+
+# How were we called
+[ "$6" = "/etc/ppp/ip-up" ] && REMOTE_IPADDR=$4	# IP assigned by ISP
+
+iptables -t nat -F nat-masks
+
+masquerade() {
+ eval `ipcalc -n $1 $2`
+ if [ "$LOCAL_NETWORK/$LOCAL_NETMASK" != "$NETWORK/$2" ]; then
+	iptables -t nat -I nat-masks -s $NETWORK/$2 -o $IF_INET -j MASQUERADE
+	[ -n "$INET2_IPADDR" ] && iptables -t nat -I nat-masks -s $NETWORK/$2 -o $IF_INET2 -j MASQUERADE
+	[ -n "$INET3_IPADDR" ] && iptables -t nat -I nat-masks -s $NETWORK/$2 -o $IF_INET3 -j MASQUERADE
+	[ -n "$INET4_IPADDR" ] && iptables -t nat -I nat-masks -s $NETWORK/$2 -o $IF_INET4 -j MASQUERADE
+ fi
+}
+
+eval `ipcalc -n $LOCAL_IPADDR $LOCAL_NETMASK`
+LOCAL_NETWORK=$NETWORK
+
+[ -n "$DMZ_IPADDR" ] && \
+  { eval `ipcalc -n $DMZ_IPADDR $DMZ_NETMASK`; DMZ_NETWORK=$NETWORK; }
+
+iptables -t nat -I nat-masks -s $LOCAL_NETWORK/$LOCAL_NETMASK -o $IF_INET -j MASQUERADE
+[ -n "$INET2_IPADDR" ] && iptables -t nat -I nat-masks -s $LOCAL_NETWORK/$LOCAL_NETMASK -o $IF_INET2 -j MASQUERADE
+[ -n "$INET3_IPADDR" ] && iptables -t nat -I nat-masks -s $LOCAL_NETWORK/$LOCAL_NETMASK -o $IF_INET3 -j MASQUERADE
+[ -n "$INET4_IPADDR" ] && iptables -t nat -I nat-masks -s $LOCAL_NETWORK/$LOCAL_NETMASK -o $IF_INET4 -j MASQUERADE
+
+[ ! -z $LOCAL_IPADDR2 ] && masquerade $LOCAL_IPADDR2 $LOCAL_NETMASK2
+[ ! -z $LOCAL_IPADDR3 ] && masquerade $LOCAL_IPADDR3 $LOCAL_NETMASK3
+
+if [ ! -z $DMZ_IPADDR ]; then
+ masquerade $DMZ_IPADDR $DMZ_NETMASK
+ [ ! -z $DMZ_IPADDR2 ] && masquerade $DMZ_IPADDR2 $DMZ_NETMASK2
+ [ ! -z $DMZ_IPADDR3 ] && masquerade $DMZ_IPADDR3 $DMZ_NETMASK3
+fi
+
+[ ! -z $LOCAL2_IPADDR ] && masquerade $LOCAL2_IPADDR $LOCAL2_NETMASK
+[ ! -z $LOCAL3_IPADDR ] && masquerade $LOCAL3_IPADDR $LOCAL3_NETMASK
+[ ! -z $LOCAL4_IPADDR ] && masquerade $LOCAL4_IPADDR $LOCAL2_NETMASK
+[ ! -z $WLAN_IPADDR ] && masquerade $WLAN_IPADDR $WLAN_NETMASK
+
+# Flush the iptables rules associated with port forwarding
+iptables -F autofw-acl
+iptables -t nat -F auto-forward
+iptables -F portfw-acl
+iptables -t nat -F port-forward
+iptables -t nat -F dns-preroute
+iptables -t nat -F dns-postroute
+
+set_auto_forward() {
+ [ $DEBUG = 1 ] && logger $FWDRULE
+ if [ $# -lt 4 ]; then
+	echo "   Invalid auto forward entry rule in /etc/coyote/portforwards"
+	return 1
+ fi
+ shift
+
+ if [ "$1" = "y" ]; then
+	PORTOPT=""
+	DESTADDR=""
+
+	if [ "$2" != "tcp" -a "$2" != "udp" ]; then                                                                                   
+		DESTADDR="$3"
+	else
+		PORTOPT="--dport $3"
+		DESTADDR="$4"
+	fi
+
+	# Add the input acl
+	[ "$LOG_INCOMING_ACCESS" = "YES" ] && iptables -A autofw-acl -i $IF_INET -p $2 -d $DESTADDR $PORTOPT -j LOG --log-prefix "PORT FORWARDING:"
+	iptables -A autofw-acl -i $IF_INET -p $2 -d $DESTADDR $PORTOPT -j ACCEPT
+       [ $DEBUG = 1 ] && logger "iptables -A autofw-acl -i $IF_INET -p $2 -d $DESTADDR $PORTOPT -j ACCEPT"
+
+	# Add the forward
+	iptables -t nat -A auto-forward -i $IF_INET -p $2 $PORTOPT -j DNAT --to $DESTADDR
+	[ $DEBUG = 1 ] && logger "iptables -t nat -A auto-forward -i $IF_INET -p $2 $PORTOPT -j DNAT --to $DESTADDR"
+
+	if [ "$4" = "dns" -o "$5" = "dns" ]; then
+		# Add pre-route for lan to wan ip
+		iptables -t nat -A dns-preroute -i $IF_LOCAL -p $2 \
+		-d $IPADDR $PORTOPT -j DNAT --to $DESTADDR
+		[ $DEBUG = 1 ] && logger "iptables -t nat -A dns-preroute -i $IF_LOCAL -p $2 -d $IPADDR $PORTOPT -j DNAT --to $DESTADDR"
+
+		# Add post-route for lan to wan ip
+		iptables -t nat -A dns-postroute -o $IF_LOCAL -p $2 \
+		-s $LOCAL_NETWORK/$LOCAL_NETMASK \
+		-d $DESTADDR $PORTOPT -j SNAT --to $LOCAL_IPADDR
+		[ $DEBUG = 1 ] && logger "iptables -t nat -A dns-postroute -o $IF_LOCAL -p $2 -s $LOCAL_NETWORK/$LOCAL_NETMASK -d $DESTADDR $PORTOPT -j SNAT --to $LOCAL_IPADDR"
+	fi
+ fi
+}
+
+set_port_forward() {
+ [ $DEBUG = 1 ] && logger $FWDRULE
+ if [ $# -lt 3 ]; then
+	echo "   Invalid port forward entry rule in /etc/coyote/portforwards"
+	return 1
+ fi
+ shift
+ if [ "$1" = "y" ]; then
+	PORTOPT=""
+	PROTOOPT=""
+       ADDR="$2"
+	DESTADDR="$2"
+
+	if [ ! -z "$3" ] && [ "$3" != "tcp" -a "$3" != "udp" ]; then
+	 INETADDR="$3"
+	 shift
+	else
+	 INETADDR="$IPADDR"
+	fi
+
+	[ ! -z "$3" ] && PROTOOPT="-p $3"
+
+	if [ ! -z "$4" ] && [ "$4" != "dns" ]; then
+	 PORTOPT="--dport $4"
+	fi
+
+	if [ ! -z "$5" ] && [ "$5" != "dns" ]; then
+	 DESTADDR="${DESTADDR}:${5}"
+	 ACLOPT="--dport $5"
+	else
+	 [ -z "$3" ] && [ "$3" = "tcp" -a "$3" = "udp" ] || ACLOPT="$PORTOPT"
+	fi
+
+ # Add the forward acl
+ [ "$LOG_INCOMING_ACCESS" = "YES" ] && iptables -A portfw-acl -d $ADDR $PROTOOPT $ACLOPT -j LOG --log-prefix "PORT FORWARDING:"
+ iptables -A portfw-acl -d $ADDR $PROTOOPT $ACLOPT -j ACCEPT
+ [ $DEBUG = 1 ] && logger "iptables -A portfw-acl -d $ADDR $PROTOOPT $ACLOPT -j ACCEPT"
+
+ # Add the DNAT entry to forward the port
+ iptables -t nat -A port-forward -d $INETADDR $PROTOOPT $PORTOPT -j DNAT --to $DESTADDR
+ [ $DEBUG = 1 ] && logger "iptables -t nat -A port-forward -d $INETADDR $PROTOOPT $PORTOPT -j DNAT --to $DESTADDR"
+
+ if [ "$4" = "dns" -o "$5" = "dns" -o "$6" = "dns" -o "$7" = "dns" ]; then
+	# Add pre-route for lan to wan ip
+	iptables -t nat -A dns-preroute $PROTOOPT -s $LOCAL_NETWORK/$LOCAL_NETMASK \
+	-d $INETADDR $PORTOPT -j DNAT --to $DESTADDR
+	[ $DEBUG = 1 ] && logger "iptables -t nat -A dns-preroute $PROTOOPT -s $LOCAL_NETWORK/$LOCAL_NETMASK -d $INETADDR $PORTOPT -j DNAT --to $DESTADDR"
+
+	# Add post-route for lan to wan ip
+	iptables -t nat -A dns-postroute $PROTOOPT -s $LOCAL_NETWORK/$LOCAL_NETMASK \
+	-d $ADDR $ACLOPT -j SNAT --to $LOCAL_IPADDR
+	[ $DEBUG = 1 ] && logger "iptables -t nat -A dns-postroute $PROTOOPT -s $LOCAL_NETWORK/$LOCAL_NETMASK -d $ADDR $ACLOPT -j SNAT --to $LOCAL_IPADDR"
+	fi
+ fi
+}
+
+if [ -r /etc/coyote/portforwards ]; then
+ echo "Configuring port forwarding for internal hosts..."
+	cat /etc/coyote/portforwards | while read FWDRULE; do
+	 FWDRULE=`echo $FWDRULE | cut -f 1 -d \#| tr [A-Z] [a-z]`
+	 case "$FWDRULE" in
+		\#*|"") continue ;;
+		auto*) set_auto_forward $FWDRULE ;;
+		port*) set_port_forward $FWDRULE ;;
+	 esac
+	done
+fi

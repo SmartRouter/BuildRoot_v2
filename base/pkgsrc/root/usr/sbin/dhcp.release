@@ -1,0 +1,18 @@
+#!/bin/sh
+#
+# DHCP Release IP
+# 
+# Claudio Roberto Cussuol
+# 20/08/2004
+#
+. /tmp/netsubsys.state
+if [ -f /var/run/udhcpc.pid ]; then
+      	kill -SIGUSR2 `cat /var/run/udhcpc.pid`
+	echo
+	echo "Sent RELEASE signal to DHCP client"
+	echo
+	sleep 2
+	/sbin/ifconfig $IF_INET
+else
+        echo "DHCP Client is not running"
+fi

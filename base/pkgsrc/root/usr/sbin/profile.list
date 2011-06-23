@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# List Profiles Script for Coyote Linux
+# Author:  Claudio Roberto Cussuol  
+#          29/05/2005
+#
+
+ls /etc/coyote/profiles/*.prf > /dev/null 2> /dev/null
+if [ $? = 0 ] ; then
+  cd /etc/coyote/profiles
+  ls *.prf | sed s/.prf//g
+fi

@@ -1,0 +1,583 @@
+#!/bin/sh
+#
+# Steve Eisner - seisner@comcast.net
+# 2/12/2003
+#
+# Coyote Firewall Startup Script
+#	called by: /etc/rc.d/rc.inet, /etc/ppp/ip-up, /etc/dhcpc/dhcpc.updown
+
+DEBUG=0
+
+PATH=$PATH:/usr/sbin
+
+# Load Coyote variables
+[ -z "$CONFIG_LOADED" ] && . /etc/coyote/coyote.conf
+[ -e /tmp/netsubsys.state ] && . /tmp/netsubsys.state
+
+if [ -n "$1" ]; then
+ IF_INET=$1
+ logger -p daemon.info -t rc.firewall "Firewall script called with: ${@}"
+else
+ if [ "$INETTYPE" = "PPPOE" -o "$INETTYPE" = "PPP" ]; then
+	IF_INET=ppp0
+ elif [ -z "$IF_INET" ] ; then
+	IF_INET=eth1
+ fi
+ logger -p daemon.info -t rc.firewall "Firewall script set with default: ${IF_INET}"
+fi
+
+IPADDR=`getifaddr $IF_INET`
+
+# Renew call to if-filter (just to be sure it will be the last one)
+iptables -D INPUT   -m state --state NEW -j if-filter  2>/dev/null
+iptables -A INPUT   -m state --state NEW -j if-filter  2>/dev/null
+iptables -D FORWARD -m state --state NEW -j if-filter  2>/dev/null
+iptables -A FORWARD -m state --state NEW -j if-filter  2>/dev/null
+
+# Build Log and Drop chain
+iptables -F log-and-drop
+[ "$LOG_ATTEMPTS" = "YES" ] && iptables -A log-and-drop -j LOG --log-prefix "BLOCKED CONNECTION:"
+iptables -A log-and-drop -j DROP
+
+# Build Interface Filtering Chain
+iptables -F if-filter
+iptables -A if-filter -i $IF_INET -j log-and-drop
+[ -n "$INET2_IPADDR" ] && iptables -A if-filter -i $IF_INET2 -j log-and-drop
+[ -n "$INET3_IPADDR" ] && iptables -A if-filter -i $IF_INET3 -j log-and-drop
+[ -n "$INET4_IPADDR" ] && iptables -A if-filter -i $IF_INET4 -j log-and-drop
+[ -n "$DMZ_IPADDR" ] && iptables -A if-filter -i $IF_DMZ -o $IF_LOCAL -j log-and-drop
+[ -n "$DMZ_IPADDR" ] && [ -n "$LOCAL2_IPADDR" ] && iptables -A if-filter -i $IF_DMZ -o $IF_LOCAL2 -j log-and-drop
+[ -n "$DMZ_IPADDR" ] && [ -n "$LOCAL3_IPADDR" ] && iptables -A if-filter -i $IF_DMZ -o $IF_LOCAL3 -j log-and-drop
+[ -n "$DMZ_IPADDR" ] && [ -n "$LOCAL4_IPADDR" ] && iptables -A if-filter -i $IF_DMZ -o $IF_LOCAL4 -j log-and-drop
+[ -n "$DMZ_IPADDR" ] && [ -n "$WLAN_IPADDR" ]   && iptables -A if-filter -i $IF_DMZ -o $IF_WLAN   -j log-and-drop
+
+# Flush the iptables rules associated with forwarding
+iptables -F access-acl
+iptables -F remote-admin
+iptables -t nat -F nat-acl
+
+# Flush the iptables rules for simplified firewall
+iptables -F user-filter
+iptables -F port-filter
+iptables -t mangle -F l7-filter
+
+# Pre firewall rules
+if [ -r /etc/coyote/firewall.pre ]; then
+ # echo "Configuring pre firewall rules..."
+ . /etc/coyote/firewall.pre
+fi
+
+set_address() {
+ PP="$1"
+
+ NOT=`echo "$PP" | cut -c -3`
+ [ "$NOT" = "not" ] && PP=`echo "$PP" | cut -c 5-`
+ TAG=`echo "$PP" | cut -c -3`
+ [ "$TAG" = mac ] 2>/dev/null && PP=`echo "$PP" | cut -c 5-`
+
+ case $PP in
+	lan) [ -z $LOCAL_IPADDR ] && return 1
+	 ADDRESS="$LOCAL_IPADDR"; return 0;
+ ;;
+	lan2) [ -z $LOCAL_IPADDR2 ] && return 1
+	 ADDRESS="$LOCAL_IPADDR2"; return 0;
+ ;;
+	lan3) [ -z $LOCAL_IPADDR3 ] && return 1
+	 ADDRESS="$LOCAL_IPADDR3"; return 0;
+ ;;
+	lan-if) [ -z $IF_LOCAL ] && return 1
+	 ADDRESS="$IF_LOCAL"; return 0;
+ ;;
+	lan-net) [ -z $LOCAL_IPADDR ] || [ -z $LOCAL_NETMASK ] && return 1
+	 eval `ipcalc -p -n $LOCAL_IPADDR $LOCAL_NETMASK`
+	 ADDRESS="$NETWORK/$PREFIX"
+	 return 0
+ ;;
+	lan2-net) [ -z $LOCAL_IPADDR2 ] || [ -z $LOCAL_NETMASK2 ] && return 1
+	 eval `ipcalc -p -n $LOCAL_IPADDR2 $LOCAL_NETMASK2`
+	 ADDRESS="$NETWORK/$PREFIX"
+	 return 0
+ ;;
+	lan3-net) [ -z $LOCAL_IPADDR3 ] || [ -z $LOCAL_NETMASK3 ] && return 1
+	 eval `ipcalc -p -n $LOCAL_IPADDR3 $LOCAL_NETMASK3`
+	 ADDRESS="$NETWORK/$PREFIX"
+	 return 0
+ ;;
+	int) [ -z $IPADDR ] && return 1
+	 ADDRESS="$IPADDR"; return 0;
+ ;;
+	int2) [ -z $IPADDR2 ] && return 1
+	 ADDRESS="$IPADDR2"; return 0;
+ ;;
+	int3) [ -z $IPADDR3 ] && return 1
+	 ADDRESS="$IPADDR3"; return 0;
+ ;;
+	int-if) [ -z $IF_INET ] && return 1
+	 ADDRESS="$IF_INET"; return 0;
+ ;;
+	int-net) [ -z $IPADDR ] || [ -z $NETMASK ] && return 1
+	 eval `ipcalc -p -n $IPADDR $NETMASK`
+	 ADDRESS="$NETWORK/$PREFIX"
+	 return 0
+ ;;
+	int2-net) [ -z $IPADDR2 ] || [ -z $NETMASK2 ] && return 1
+	 eval `ipcalc -p -n $IPADDR2 $NETMASK2`
+	 ADDRESS="$NETWORK/$PREFIX"
+	 return 0
+ ;;
+	int3-net) [ -z $IPADDR3 ] || [ -z $NETMASK3 ] && return 1
+	 eval `ipcalc -p -n $IPADDR3 $NETMASK3`
+	 ADDRESS="$NETWORK/$PREFIX"
+	 return 0
+ ;;
+	wan2) [ -z $INET2_IPADDR ] && return 1
+	 ADDRESS="$INET2_IPADDR"; return 0;
+ ;;
+	wan2-if) [ -z $IF_INET2 ] && return 1
+	 ADDRESS="$IF_INET2"; return 0;
+ ;;
+	wan2-net) [ -z $INET2_IPADDR ] || [ -z $INET2_NETMASK ] && return 1
+	 eval `ipcalc -p -n $INET2_IPADDR $INET2_NETMASK`
+	 ADDRESS="$NETWORK/$PREFIX"; return 0;
+ ;;
+	wan3) [ -z $INET3_IPADDR ] && return 1
+	 ADDRESS="$INET3_IPADDR"; return 0;
+ ;;
+	wan3-if) [ -z $IF_INET3 ] && return 1
+	 ADDRESS="$IF_INET3"; return 0;
+ ;;
+	wan3-net) [ -z $INET3_IPADDR ] || [ -z $INET3_NETMASK ] && return 1
+	 eval `ipcalc -p -n $INET3_IPADDR $INET3_NETMASK`
+	 ADDRESS="$NETWORK/$PREFIX"; return 0;
+ ;;
+	wan4) [ -z $INET4_IPADDR ] && return 1
+	 ADDRESS="$INET4_IPADDR"; return 0;
+ ;;
+	wan4-if) [ -z $IF_INET4 ] && return 1
+	 ADDRESS="$IF_INET4"; return 0;
+ ;;
+	wan4-net) [ -z $INET4_IPADDR ] || [ -z $INET4_NETMASK ] && return 1
+	 eval `ipcalc -p -n $INET4_IPADDR $INET4_NETMASK`
+	 ADDRESS="$NETWORK/$PREFIX"; return 0;
+ ;;
+	dmz) [ -z $DMZ_IPADDR ] && return 1
+	 ADDRESS="$DMZ_IPADDR"; return 0;
+ ;;
+	dmz2) [ -z $DMZ_IPADDR2 ] && return 1
+	 ADDRESS="$DMZ_IPADDR2"; return 0;
+ ;;
+	dmz3) [ -z $DMZ_IPADDR3 ] && return 1
+	 ADDRESS="$DMZ_IPADDR3"; return 0;
+ ;;
+	dmz-if) [ -z $IF_DMZ ] && return 1
+	 ADDRESS="$IF_DMZ"; return 0;
+ ;;
+	dmz-net) [ -z $DMZ_IPADDR ] || [ -z $DMZ_NETMASK ] && return 1
+	 eval `ipcalc -p -n $DMZ_IPADDR $DMZ_NETMASK`
+	 ADDRESS="$NETWORK/$PREFIX"
+	 return 0
+ ;;
+	dmz2-net) [ -z $DMZ_IPADDR2 ] || [ -z $DMZ_NETMASK2 ] && return 1
+	 eval `ipcalc -p -n $DMZ_IPADDR2 $DMZ_NETMASK2`
+	 ADDRESS="$NETWORK/$PREFIX"
+	 return 0
+ ;;
+	dmz3-net) [ -z $DMZ_IPADDR3 ] || [ -z $DMZ_NETMASK3 ] && return 1
+	 eval `ipcalc -p -n $DMZ_IPADDR3 $DMZ_NETMASK3`
+	 ADDRESS="$NETWORK/$PREFIX"
+	 return 0
+ ;;
+	local2) [ -z $LOCAL2_IPADDR ] && return 1
+	 ADDRESS="$LOCAL2_IPADDR"; return 0;
+ ;;
+	local2-if) [ -z $IF_LOCAL2 ] && return 1
+	 ADDRESS="$IF_LOCAL2"; return 0;
+ ;;
+	local2-net) [ -z $LOCAL2_IPADDR ] || [ -z $LOCAL2_NETMASK ] && return 1
+	 eval `ipcalc -p -n $LOCAL2_IPADDR $LOCAL2_NETMASK`
+	 ADDRESS="$NETWORK/$PREFIX"; return 0;
+ ;;
+	local3) [ -z $LOCAL3_IPADDR ] && return 1
+	 ADDRESS="$LOCAL3_IPADDR"; return 0;
+ ;;
+	local3-if) [ -z $IF_LOCAL3 ] && return 1
+	 ADDRESS="$IF_LOCAL3"; return 0;
+ ;;
+	local3-net) [ -z $LOCAL3_IPADDR ] || [ -z $LOCAL3_NETMASK ] && return 1
+	 eval `ipcalc -p -n $LOCAL3_IPADDR $LOCAL3_NETMASK`
+	 ADDRESS="$NETWORK/$PREFIX"
+	return 0
+ ;;
+	local4) [ -z $LOCAL4_IPADDR ] && return 1
+	 ADDRESS="$LOCAL4_IPADDR"; return 0;
+ ;;
+	local4-if) [ -z $IF_LOCAL4 ] && return 1
+	 ADDRESS="$IF_LOCAL4"; return 0;
+ ;;
+	local4-net) [ -z $LOCAL4_IPADDR ] || [ -z $LOCAL4_NETMASK ] && return 1
+	 eval `ipcalc -p -n $LOCAL4_IPADDR $LOCAL4_NETMASK`
+	 ADDRESS="$NETWORK/$PREFIX"
+	return 0
+ ;;
+	wlan) [ -z $WLAN_IPADDR ] && return 1
+	 ADDRESS="$WLAN_IPADDR"; return 0;
+ ;;
+	wlan-if) [ -z $IF_WLAN ] && return 1
+	 ADDRESS="$IF_WLAN"; return 0;
+ ;;
+	wlan-net) [ -z $WLAN_IPADDR ] || [ -z $WLAN_NETMASK ] && return 1
+	 eval `ipcalc -p -n $WLAN_IPADDR $WLAN_NETMASK`
+	 ADDRESS="$NETWORK/$PREFIX"
+	return 0
+ ;;
+	any|all) ADDRESS="0.0.0.0/0"; return 0;
+ ;;
+	*) ADDRESS="$PP"
+	 [ "$NOT" = "not" ] && ADDRESS="! $ADDRESS"
+	 return 0
+ ;;
+esac
+[ "$NOT" = "not" ] && ADDRESS="! $ADDRESS"
+}
+
+set_access() {
+	[ $DEBUG = 1 ] && logger $FWDRULE
+        if [ $# -lt 7 ]; then
+		echo "   Invalid access entry rule line# $LINE in /etc/coyote/firewall"
+		return 1
+	fi
+
+        if [ "$2" = "y" ]; then
+        	# Rule Option
+        	RULE=
+		if [ "$3" = "permit" ]; then
+			RULE=ACCEPT
+		elif [ "$3" = "deny" ]; then
+			RULE=REJECT
+		else
+			RULE="$3"
+		fi
+		
+		# Protocol Option
+		PROTO="$4"
+        	PROTOOPT=
+		if [ "$PROTO" = "any" -o "$PROTO" = "all" ]; then
+			PROTOOPT=""
+		elif [ "$PROTO" = "icmp" -o "$PROTO" = "tcp" -o "$PROTO" = "udp" ] || [ "$PROTO" -ge 0 -a "$PROTO" -le 255 ] 2>/dev/null; then
+			PROTOOPT="-p $PROTO"
+		else
+			echo "   Firewall rule line# $LINE - protocol option error"
+			return 1
+		fi
+		
+        	# Source Address Option
+		SRC="$5"
+        	TAG=
+        	SRCTAG=
+        	SRCOPT=
+        	set_address $SRC
+        	if [ $? -ne 0 ]; then
+        		echo "   Firewall rule line# $LINE - source address error"
+        		return 1
+        	elif [ "$TAG" = mac ]; then
+        		SRCTAG="$TAG"
+        		SRCOPT="--match mac --mac-source $ADDRESS"
+		elif [ "$SRC" = "lan-if" -o "$SRC" = "int-if" -o "$SRC" = "dmz-if" -o "$SRC" = "local2-if" -o "$SRC"  = "local3-if" -o "$SRC"  = "local4-if" -o "$SRC" = "wlan-if" -o "$SRC" = "int2-if" -o "$SRC" = "int3-if" -o "$SRC" = "wan2-if" -o "$SRC" = "wan3-if" -o "$SRC" = "wan4-if" ]; then
+        		SRCOPT="-i $ADDRESS"
+        	else
+	        	SRCOPT="-s $ADDRESS"
+	        fi
+        	
+        	# Destination Address Option
+		DEST="$6"
+        	TAG=
+        	DESTTAG=
+        	DSTOPT=
+        	set_address $DEST
+        	if [ $? -ne 0 ]; then
+        		echo "   Firewall rule line# $LINE - destination address error"
+        		return 1
+        	elif [ "$TAG" = mac ]; then
+        		DESTTAG="$TAG"
+        		DSTOPT="--match mac --mac-source $ADDRESS"
+        	elif [ "$DEST" = "lan-if" -o "$DEST" = "int-if" -o "$DEST" = "dmz-if" -o "$DEST" = "local2-if" -o "$DEST"  = "local3-if" -o "$DEST"  = "local4-if" -o "$DEST" = "wlan-if" -o "$DEST" = "int2-if" -o "$DEST" = "int3-if" -o "$DEST" = "wan2-if" -o "$DEST" = "wan3-if" -o "$DEST" = "wan4-if" ]; then
+        		DSTOPT="-o $ADDRESS"
+        	else
+        		DSTOPT="-d $ADDRESS"
+        	fi
+		
+		#Dport Option
+		DPORT=`echo $7 | sed s/not:/!\ /`
+        	DPORTOPT=
+		if [ "$DPORT" = "any" -o "$DPORT" = "all" -o "$PROTOOPT" = "" ]; then
+			DPORTOPT=""
+		elif [ "$PROTO" = "icmp" ]; then
+			DPORTOPT="--icmp-type $DPORT"
+		elif [ ! -z "$DPORT" ]; then
+			DPORTOPT="--dport $DPORT"
+		else
+			echo "   Firewall rule line# $LINE - Dest. port option error"
+			return 1
+		fi
+
+		#Sport Option
+		SPORT=`echo $8 | sed s/not:/!\ /`
+        	SPORTOPT=
+		if [ "$SPORT" = "any" -o "$SPORT" = "all" -o "$PROTOOPT" = "" ]; then
+			SPORTOPT=""
+		elif [ "$PROTO" = "icmp" ]; then
+			SPORTOPT="--icmp-type $DPORT"
+		elif [ ! -z "$SPORT" ]; then
+			SPORTOPT="--sport $SPORT"
+		else
+			echo "   Firewall rule line# $LINE - Source port option error"
+			return 1
+		fi
+	else
+		return 0
+	fi	
+	
+	# Add the control acl
+	if [ $1 = access -a "$SRCTAG" = mac -a $6 = int-if ]; then
+		iptables -t nat -A nat-acl $PROTOOPT $SRCOPT $DSTOPT $DPORTOPT $SPORTOPT -j $RULE
+		[ $DEBUG = 1 ] && logger "iptables -t nat -A nat-acl $PROTOOPT $SRCOPT $DSTOPT $DPORTOPT $SPORTOPT -j $RULE"
+
+	elif [ $1 = access -a "$DESTTAG" = mac ] && [ $5 = lan-if -o $5 = dmz-if ]; then
+		iptables -A remote-admin $PROTOOPT $SRCOPT $DSTOPT $DPORTOPT $SPORTOPT -j $RULE
+		[ $DEBUG = 1 ] && logger "iptables -A remote-admin $PROTOOPT $SRCOPT $DSTOPT $DPORTOPT $SPORTOPT -j $RULE"
+
+	elif [ $1 != admin ]; then
+		iptables -A access-acl $PROTOOPT $SRCOPT $DSTOPT $DPORTOPT $SPORTOPT -j $RULE
+		[ $DEBUG = 1 ] && logger "iptables -A access-acl $PROTOOPT $SRCOPT $DSTOPT $DPORTOPT $SPORTOPT -j $RULE"
+
+	elif [ $1 = admin ]; then
+		 iptables -A remote-admin $PROTOOPT $SRCOPT $DSTOPT $DPORTOPT $SPORTOPT -j $RULE
+		[ $DEBUG = 1 ] && logger "iptables -A remote-admin $PROTOOPT $SRCOPT $DSTOPT $DPORTOPT $SPORTOPT -j $RULE"
+	fi
+}
+
+#Simplified Firewall Functions
+block_ip() {
+ if [ "$DEFAULT_USERS_FILTER" != "BLOCK_ALL" ] ; then
+	[ $DEBUG = 1 ] && logger $FWDRULE
+	COMMAND="iptables -A user-filter -s $1 -j DROP"
+	$COMMAND
+	[ $DEBUG = 1 ] && logger "$COMMAND"
+ fi		
+}
+
+allow_ip() {
+ if [ "$DEFAULT_USERS_FILTER" = "BLOCK_ALL" ] ; then
+	[ $DEBUG = 1 ] && logger $FWDRULE
+	COMMAND="iptables -A user-filter -s $1 -j RETURN"
+	$COMMAND
+	[ $DEBUG = 1 ] && logger "$COMMAND"
+ fi
+}
+
+block_mac() {
+ if [ "$DEFAULT_USERS_FILTER" != "BLOCK_ALL" ] ; then
+	[ $DEBUG = 1 ] && logger $FWDRULE
+	COMMAND="iptables -A user-filter --match mac --mac-source $1 -j DROP"
+	$COMMAND
+	[ $DEBUG = 1 ] && logger "$COMMAND"
+ fi		
+}
+
+allow_mac() {
+ if [ "$DEFAULT_USERS_FILTER" = "BLOCK_ALL" ] ; then
+	[ $DEBUG = 1 ] && logger $FWDRULE
+	COMMAND="iptables -A user-filter --match mac --mac-source $1 -j RETURN"
+	$COMMAND
+	[ $DEBUG = 1 ] && logger "$COMMAND"
+ fi
+}
+
+match_ip_mac() {
+ if [ "$DEFAULT_USERS_FILTER" = "BLOCK_ALL" ] ; then
+	[ $DEBUG = 1 ] && logger $FWDRULE
+	COMMAND="iptables -A user-filter -s $1 --match mac --mac-source $2 -j RETURN"
+	$COMMAND
+	[ $DEBUG = 1 ] && logger "$COMMAND"
+ fi
+}
+
+block_port() {
+ if [ "$DEFAULT_SERVICES_FILTER" != "BLOCK_ALL" ] ; then
+	[ $DEBUG = 1 ] && logger $FWDRULE
+	PORTOPT=""
+	case $1 in
+	 tcp|udp|icmp|gre) PROTO=$1 ;;
+	 *)
+		PORT=$1
+		if [ ! -z $2 ]; then
+		 PROTO=$2
+			if [ "$PROTO" = "icmp" ]; then
+			 PORTOPT="--icmp-type $PORT"
+			elif [ ! -z "$PORT" ]; then
+			 PORTOPT="--dport $PORT"
+			fi
+		else
+		 PROTO=tcp
+		 PORTOPT="--dport $PORT"
+		fi
+	 ;;
+	esac
+	COMMAND="iptables -A port-filter -p $PROTO $PORTOPT -j DROP"
+	$COMMAND
+	[ $DEBUG = 1 ] && logger "$COMMAND"
+ fi
+}
+
+allow_port() {
+ if [ "$DEFAULT_SERVICES_FILTER" = "BLOCK_ALL" ] ; then
+	[ $DEBUG = 1 ] && logger $FWDRULE
+	PORTOPT=""
+	case $1 in
+	 tcp|udp|icmp|gre) PROTO=$1	 ;;
+	 *)
+		PORT=$1
+		if [ ! -z $2 ]; then
+		 PROTO=$2
+			if [ "$PROTO" = "icmp" ]; then
+			 PORTOPT="--icmp-type $PORT"
+			elif [ ! -z "$PORT" ]; then
+			 PORTOPT="--dport $PORT"
+			fi
+		else
+		 PROTO=tcp
+		 PORTOPT="--dport $PORT"
+		fi
+	 ;;
+	esac
+	COMMAND="iptables -A port-filter -p $PROTO $PORTOPT -j ACCEPT"
+	$COMMAND
+	[ $DEBUG = 1 ] && logger "$COMMAND"
+ fi
+}
+
+block_protocol() {
+ [ $DEBUG = 1 ] && logger $FWDRULE
+ COMMAND="iptables -t mangle -A l7-filter -m layer7 --l7proto $1 -j DROP"
+ $COMMAND
+ [ $DEBUG = 1 ] && logger "$COMMAND"
+}
+
+#Set permission to access dhcp server when policy is block all users
+
+if [ "$DEFAULT_USERS_FILTER" = "BLOCK_ALL" -a "$DHCPSERVER" = "YES" ] ; then
+ COMMAND="iptables -I user-filter -p udp --dport 67 -j RETURN"
+ $COMMAND
+ [ $DEBUG = 1 ] && logger "$COMMAND"
+fi
+
+#Set permission to access DNS server when policy is block all users
+
+if [ "$DEFAULT_USERS_FILTER" = "BLOCK_ALL" -a "$USE_DNS_CACHE" = "YES" ] ; then
+ COMMAND="iptables -I user-filter -p udp --dport 53 -j RETURN"
+ $COMMAND
+ [ $DEBUG = 1 ] && logger "$COMMAND"
+fi
+
+# Set administrative options
+[ -z "$SSH_PORT" ] && SSH_PORT=22
+[ -z "`sed /^.*"tcp int-if any "$SSH_PORT" 1024:65535"/!d /etc/coyote/firewall`" ] && \
+ sed -ie '10i\' -e "admin N permit tcp int-if any "$SSH_PORT" 1024:65535 #Example - Permit external SSH access" /etc/coyote/firewall
+[ "$ENABLE_EXTERNAL_SSH" != "NO" ] && sed -i /"permit tcp int-if any "$SSH_PORT" 1024:65535"/s/N/Y/g /etc/coyote/firewall \
+ || sed -i /"permit tcp int-if any "$SSH_PORT" 1024:65535"/s/Y/N/g /etc/coyote/firewall
+
+[ -z "`sed /^.*"icmp int-if any echo-request all"/!d /etc/coyote/firewall`" ] && \
+ sed -ie '11i\' -e "admin N permit icmp int-if any echo-request all #Example - Permit external PING reply" /etc/coyote/firewall
+[ "$ENABLE_EXTERNAL_PING" = "YES" ] && sed -i /"icmp int-if any echo-request all"/s/N/Y/g /etc/coyote/firewall \
+ || sed -i /"icmp int-if any echo-request all"/s/Y/N/g /etc/coyote/firewall
+
+# Process firewall rules file
+if [ -r /etc/coyote/firewall ]; then
+ echo "Configuring firewall rules..."
+ LINE=0
+ cat /etc/coyote/firewall | while read FWDRULE; do
+	LINE=$(($LINE+1))
+	FWDRULE=`echo "$FWDRULE" | cut -f 1 -d \# | tr [A-Z] [a-z]`
+	case "$FWDRULE" in
+	 \#*|"") continue ;;
+	 access*) set_access $FWDRULE ;;
+	 admin*) set_access $FWDRULE ;;
+	 block_ip*) $FWDRULE ;;
+	 allow_ip*) $FWDRULE ;;
+	 block_port*) $FWDRULE ;;
+	 allow_port*) $FWDRULE ;;
+	 block_mac*) $FWDRULE ;;
+	 allow_mac*) $FWDRULE ;;
+	 block_protocol*) $FWDRULE ;;
+	 match_ip_mac*) $FWDRULE ;;
+	esac
+ done
+fi
+
+blk_lan() {
+ COMMAND="iptables -A $1 -i $2 -j DROP"
+ $COMMAND
+ [ $DEBUG = 1 ] && logger "$COMMAND"
+}
+
+#Set default policies to Simplified Firewall
+if [ "$DEFAULT_USERS_FILTER" = "BLOCK_ALL" ] ; then
+ [ $DEBUG = 1 ] && DEFAULT_USERS_FILTER=BLOCK_ALL
+ COMMAND="iptables -A user-filter -i $IF_LOCAL  -j DROP"
+ $COMMAND
+ [ $DEBUG = 1 ] && logger "$COMMAND"
+ [ ! -z $LOCAL2_IPADDR ] && blk_lan user-filter $IF_LOCAL2
+ [ ! -z $LOCAL3_IPADDR ] && blk_lan user-filter $IF_LOCAL3
+ [ ! -z $LOCAL4_IPADDR ] && blk_lan user-filter $IF_LOCAL4
+ [ ! -z $WLAN_IPADDR ] && blk_lan user-filter $IF_WLAN
+fi
+if [ "$DEFAULT_SERVICES_FILTER" = "BLOCK_ALL" ] ; then
+ [ $DEBUG = 1 ] && DEFAULT_SERVICES_FILTER=BLOCK_ALL
+ COMMAND="iptables -A port-filter -i $IF_LOCAL -j DROP"
+ $COMMAND
+ [ $DEBUG = 1 ] && logger "$COMMAND"
+ [ ! -z $LOCAL2_IPADDR ] && blk_lan port-filter $IF_LOCAL2
+ [ ! -z $LOCAL3_IPADDR ] && blk_lan port-filter $IF_LOCAL3
+ [ ! -z $LOCAL4_IPADDR ] && blk_lan port-filter $IF_LOCAL4
+ [ ! -z $WLAN_IPADDR ] && blk_lan port-filter $IF_WLAN
+fi
+
+# Local Custom firewall rules
+if [ -r /etc/coyote/firewall.local ]; then
+ echo "Configuring custom firewall rules..."
+ . /etc/coyote/firewall.local
+fi
+
+# Activate IP Masquerading - You can comment this line out to use Coyote as
+# as a true IP router. The masq script switches the default forwarding
+# policy to DENY (to prevent non-masq'ed routing) and establishes masquerading.
+[ "$DISABLE_NAT" != "YES" ] && . /etc/rc.d/rc.masquerade $IF_INET
+
+FILES=`ls /etc/rc.d/pkgs/lu.* 2>/dev/null`
+if [ ! -z "$FILES" ]; then
+ echo "Running Line UP Scripts..."
+ for RCS in $FILES; do
+	[ -x $RCS ] && $RCS
+ done
+fi
+
+if [ ! -z "$TIMESERVER" ]; then
+ echo -n "Setting clock using timeserver ${TIMESERVER}: "
+ logger "Setting clock using timeserver ${TIMESERVER}: "
+ /usr/sbin/ntpclient -c 1 -g 1 -h ${TIMESERVER} -s 1>/dev/null 2>&1
+ if [ $? = 0 ]; then
+	echo -e "Success."
+	logger "Success."
+	# Set the bios clock using timeserver
+	if [ -x /sbin/hwclock ]; then
+	 echo "Set the bios clock using timeserver"
+	 logger "Set the bios clock using timeserver"
+	 [ -e /var/state/adjtime ] && rm -rf /var/state/adjtime
+	 /sbin/hwclock -w -l >/dev/null
+	fi
+ else
+	echo -e "Failed!"
+	logger "Failed!"
+ fi
+fi
+

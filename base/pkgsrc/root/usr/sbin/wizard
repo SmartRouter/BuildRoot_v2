@@ -1,0 +1,813 @@
+#!/bin/sh
+# BrazilFW -- Wizard Guide v.0.9 by Washington Rodrigues #
+DIALOG=${DIALOG=dialog}
+NETWORKDEVICE=`lshw -disable dmi -disable device-tree -disable spd -disable memory -disable cpuinfo -disable cpuid -disable isapnp -disable pcmcia -disable ide -class network -short 2>/dev/null`
+OIFS="$IFS"
+IFS=" "
+PPP_DEMANDDIAL="NO"
+PPP_MODEMTTY="/dev/ttys0"
+PPP_INITSTR="ATZ"
+PPP_PORTSPEED="115200"
+PPP_ISP="ISP"
+PPP_CHATLOGIN="NO"
+PPP_STATICIP="NO"
+PPPOE_IDLE="NO"
+USE_DNS_CACHE="YES"
+ENABLE_EXTERNAL_SSH="NO"
+DOMAINNAME="domain.local"
+VAR_PASSWORD1=""
+VAR_PASSWORD2=""
+LANGUAGE="ENU"
+[ "$(ifconfig -a | grep -c -i "eth1\>")" = 0 ] && IF_INET="" || IF_INET="eth1"
+IF_LOCAL="eth0"
+COYOTE="/etc/coyote/coyote.conf"
+COYOTECONF=`cat $COYOTE`
+WIZARD_TYPE=`echo $1 | grep -i -c "\-\-INSTALL\>"`
+[ "$WIZARD_TYPE" = 1 ] && TITLETYPE="Installation" || TITLETYPE="Configuration"
+WIZARDTMP="/tmp/wizard.tmp"
+WIZARDVAR="/tmp/wizardvar.tmp"
+WIZARDTITLE="BrazilFW ($TITLETYPE) -- Wizard Guide v.0.9"
+. $COYOTE
+
+SETVAR() {
+ccount=1
+while read VALUES; do
+      VAR_NAME=`echo $1 | cut -f$ccount -d","`
+      VAR_NAME="$VAR_NAME='$VALUES'"
+      echo "$VAR_NAME" >> $WIZARDVAR
+      ccount=$((ccount+1))
+done < $WIZARDTMP
+[ -e "$WIZARDVAR" ] && . $WIZARDVAR
+rm -f $WIZARDVAR
+rm -f $WIZARDTMP
+}
+
+WAIT() {
+if [ -n "$1" ]; then
+   rm -f /tmp/TMP.done 2>/dev/null
+   (while [ ! -e "/tmp/TMP.done" ]; do
+   if [ -n "$3" ]; then
+      INITVAR="\\ - / |"
+      POS=$((POS+1))
+      ANIMATION=`echo $INITVAR | cut -f$POS -d" "`
+      [ "$POS" = 4 ] && POS=0
+   else
+      ANIMATION=""
+   fi   
+   $DIALOG --sleep 1 --colors --backtitle "$WIZARDTITLE" --infobox "\n\Z3$2\Z0 $ANIMATION" 5 40
+   done) &
+   else
+   touch "/tmp/TMP.done";wait;rm -f /tmp/TMP.done 2>/dev/null
+fi
+}
+
+
+WRITECONF() {
+     EXIST=`echo "$COYOTECONF" | grep -c -i "^$1"`
+     if [ "$EXIST" = 1 ]; then
+        COYOTECONF=`echo "$COYOTECONF" | sed s\~^"$1".*~"$1='$2'"~g`
+     else
+        COYOTECONF=$COYOTECONF`echo -e "\012$1='$2'"`     
+     fi
+}
+
+INTERFACE_NAME() {
+namedevice=`echo "$NETWORKDEVICE" | grep "$1" | sed 's/.*network//g'`
+echo $namedevice
+}         
+         
+SETCONNTYPE(){
+value=`echo $1 | sed s/\ *//g`
+case $value in
+     DHCP) INETTYPE='ETHERNET_DHCP';;
+     STATIC) INETTYPE='ETHERNET_STATIC';;
+     PPPOE) INETTYPE='PPPOE';;
+     PPP) INETTYPE='PPP';;
+esac
+}
+
+quit() {
+subreturn=0
+$DIALOG --clear \
+        --stdout \
+        --backtitle "$WIZARDTITLE" \
+        --title "Wizard" \
+        --yesno "You really want to exit the wizard?" 5 42
+subreturn=$?
+case $subreturn in
+     0) clear
+        rm -f $WIZARDVAR
+        rm -f $WIZARDTMP
+        IFS="$OIFS"
+        exit 0;;
+esac
+}
+
+ppp_main() {
+while : ; do
+subreturn=0
+exec 3>&1
+value=`$DIALOG --clear \
+        --stdout \
+        --backtitle "$WIZARDTITLE" \
+        --title "Step 3" \
+        --ok-label "Next" \
+        --cancel-label "Modem" \
+        --help-button --help-label "Cancel" \
+        --extra-button --extra-label "Back" \
+        --insecure \
+        --mixedform "Internet Configuration - PPP" 0 0 0 \
+        "Username..........:" 1 1 "$PPP_USERNAME" 1 21 22 45 0 \
+        "Password..........:" 2 1 "$PPP_PASSWORD" 2 21 22 45 1 \
+        "Phone Number......:" 3 1 "$PPP_PHONENUM" 3 21 22 45 0 \
+        "DNS1 (Optional)...:" 5 1 "$DNS1" 5 21 22 15 0 \
+        "DNS2 (Optional)...:" 6 1 "$DNS2" 6 21 22 15 0 \
+        "Hostname..........:" 7 1 "$HOSTNAME" 7 21 22 40 0 \
+        "Domain............:" 8 1 "$DOMAINNAME" 8 21 22 40 0 \
+        2>&1 1>&3 > $WIZARDTMP`
+subreturn=$?
+exec 3>&-
+     case $(cat $WIZARDTMP) in
+          HELP*) quit;;
+     esac
+     SETVAR "PPP_USERNAME,PPP_PASSWORD,PPP_PHONENUM,DNS1,DNS2,HOSTNAME,DOMAINNAME"
+     case $subreturn in
+     0) services_main;; #network_main;;
+     1) ppp_submain;;
+     3) choose_main;;
+     esac
+done
+}
+
+ppp_comm() {        
+com1=off;com2=off;com3=off;com4=off;com5=off
+if [ -z "$PPP_MODEMTTY" -o "$PPP_MODEMTTY" = "/dev/ttys0" ]; then
+   com1=on
+   elif [ "$PPP_MODEMTTY" = "/dev/ttys1" ]; then 
+   com2=on
+   elif [ "$PPP_MODEMTTY" = "/dev/ttys2" ]; then 
+   com3=on
+   elif [ "$PPP_MODEMTTY" = "/dev/ttys3" ]; then 
+   com4=on
+   else
+   com5=on
+fi
+exec 3>&1
+value=`$DIALOG --clear \
+               --backtitle "$WIZARDTITLE" \
+               --title "Step 3.1" \
+	       --ok-label "Done" \
+	       --radiolist "Modem Configuration\nChoose Comm Port:" 13 0 5 \
+	       "COM1" "" $com1 \
+	       "COM2" "" $com2 \
+	       "COM3" "" $com3 \
+	       "COM4" "" $com4 \
+	       "COM5" "" $com5 2>&1 1>&3`
+subreturn=$?
+exec 3>&-
+if [ "$subreturn" = 0 ]; then
+   case $value in
+   	COM1) PPP_MODEMTTY='/dev/ttys0';;
+        COM2) PPP_MODEMTTY='/dev/ttys1';;
+	COM3) PPP_MODEMTTY='/dev/ttys2';;
+	COM4) PPP_MODEMTTY='/dev/ttys3';;
+	COM5) PPP_MODEMTTY='/dev/ttys4';;
+   esac
+fi
+}
+
+ppp_dialling() {
+dial1=off;dial2=off;dial3=off
+if [ "$PPP_DEMANDDIAL" = "NO" ]; then
+   dial1=on
+   elif [ "$PPP_DEMANDDIAL" = "MANUAL" ]; then
+   dial3=on
+   else
+   dial2=on
+fi
+exec 3>&1
+value=`$DIALOG --clear \
+               --backtitle "$WIZARDTITLE" \
+               --title "Step 3.2" \
+               --ok-label "Done" \
+               --radiolist "Modem Configuration\nDialling Mode:" 11 0 3 \
+               "Always Connected" "" $dial1 \
+               "Dial on Demand" "" $dial2 \
+               "Manual Dialing" "" $dial3 2>&1 1>&3`
+subreturn=$?
+exec 3>&-               
+   if [ "$subreturn" = 0 ]; then  
+      case $value in
+      "Always Connected") PPP_DEMANDDIAL="NO";;
+      "Dial on Demand") PPP_DEMANDDIAL="600";;
+      "Manual Dialing") PPP_DEMANDDIAL="MANUAL";;
+      esac
+   fi
+}
+
+ppp_timeout() {        
+if [ "$dial2" != "on" ]; then
+   $DIALOG --clear \
+           --backtitle "$WIZARDTITLE" \
+           --title "On Demand Timeout" \
+           --msgbox "Error:\n\nNeed Set Dial on Demand!!!" 0 0 
+   else
+   exec 3>&1
+	value=`$DIALOG --clear \
+        	       --backtitle "$WIZARDTITLE" \
+        	       --title "Step 3.3" \
+	               --ok-label "Done" \
+                       --inputbox "On Demand Timeout:" 0 0 $PPP_DEMANDDIAL 2>&1 1>&3`
+   subreturn=$?
+   exec 3>&-
+   if [ "$subreturn" = 0 ]; then
+      PPP_DEMANDDIAL="$value"
+   fi
+fi
+}
+
+ppp_initstr() {        
+exec 3>&1
+value=`$DIALOG --clear \
+               --backtitle "$WIZARDTITLE" \
+               --title "Step 3.4" \
+               --ok-label "Done" \
+               --inputbox "Modem Init String:" 0 0 "$PPP_INITSTR" 2>&1 1>&3`
+subreturn=$?
+exec 3>&-
+if [ "$subreturn" = 0 ]; then      
+   PPP_INITSTR="$value"
+fi
+}
+
+ppp_submain() {
+while : ; do
+subreturn=0
+exec 3>&1
+selection=`$DIALOG --clear \
+        --backtitle "$WIZARDTITLE" \
+        --title "Modem Configuration" \
+        --cancel-label "Back" \
+        --ok-label "Select" \
+        --menu "" 7 0 0 \
+        "3.1" "Comm Port" \
+        "3.2" "Dialling Mode" \
+        "3.3" "On Demand Timeout" \
+        "3.4" "Modem Init String" 2>&1 1>&3`
+subreturn=$?
+exec 3>&-
+[ "$subreturn" = 1 ] && { break;ppp_main; }
+case $selection in
+     1) break;ppp_main;;
+     3.1) ppp_comm;;
+     3.2) ppp_dialling;;
+     3.3) ppp_timeout;;
+     3.4) ppp_initstr;;
+esac
+done
+}
+
+pppoe_main() {
+while : ; do
+subreturn=0
+exec 3>&1
+value=`$DIALOG --clear \
+        --stdout \
+        --backtitle "$WIZARDTITLE" \
+        --title "Step 3" \
+        --ok-label "Next" \
+        --extra-button --extra-label "Back" \
+        --insecure \
+        --mixedform "Internet Configuration - PPPOE DSL" 0 0 0 \
+        "Username..........:" 1 1 "$PPPOE_USERNAME" 1 21 22 45 0 \
+        "Password..........:" 2 1 "$PPPOE_PASSWORD" 2 21 22 45 1 \
+        "DNS1 (Optional)...:" 4 1 "$DNS1" 4 21 22 15 0 \
+        "DNS2 (Optional)...:" 5 1 "$DNS2" 5 21 22 15 0 \
+        "Hostname..........:" 6 1 "$HOSTNAME" 6 21 22 40 0 \
+        "Domain............:" 7 1 "$DOMAINNAME" 7 21 22 40 0 \
+        2>&1 1>&3 > $WIZARDTMP`
+subreturn=$?
+exec 3>&-
+     SETVAR "PPPOE_USERNAME,PPPOE_PASSWORD,DNS1,DNS2,HOSTNAME,DOMAINNAME"
+     case $subreturn in
+     0) services_main;;
+     1) quit;;
+     3) choose_main;;
+     esac
+done
+}
+
+static_main() {
+while : ; do
+subreturn=0
+exec 3>&1
+value=`$DIALOG --clear \
+        --stdout \
+        --backtitle "$WIZARDTITLE" \
+        --title "Step 3" \
+        --ok-label "Next" \
+        --extra-button --extra-label "Back" \
+        --mixedform "Internet Configuration - Static IP" 0 0 0 \
+        "IP Address........:" 1 1 "$IPADDR" 1 21 22 45 0 \
+        "SubNet Mask.......:" 2 1 "$NETMASK" 2 21 22 45 0 \
+        "Gateway...........:" 3 1 "$GATEWAY" 3 21 22 45 0 \
+        "DNS1 (Optional)...:" 4 1 "$DNS1" 4 21 22 15 0 \
+        "DNS2 (Optional)...:" 5 1 "$DNS2" 5 21 22 15 0 \
+        "Hostname..........:" 6 1 "$HOSTNAME" 6 21 22 40 0 \
+        "Domain............:" 7 1 "$DOMAINNAME" 7 21 22 40 0 \
+        2>&1 1>&3 > $WIZARDTMP`
+subreturn=$?
+exec 3>&-
+     SETVAR "IPADDR,NETMASK,GATEWAY,DNS1,DNS2,HOSTNAME,DOMAINNAME"
+     case $subreturn in
+     0) services_main;;
+     1) quit;;
+     3) choose_main;;
+     esac
+done
+}
+
+dhcp_main() {
+while : ; do
+subreturn=0
+exec 3>&1
+value=`$DIALOG --clear \
+        --stdout \
+        --backtitle "$WIZARDTITLE" \
+        --title "Step 3" \
+        --ok-label "Next" \
+        --extra-button --extra-label "Back" \
+        --mixedform "Internet Configuration - Static IP\n\nSome cable modem services supply you with\na hostname address that you must use as your\nhostname in order to obtain Internet access." 0 0 0 \
+        "DHCP Hostname....:" 1 1 "$DHCPHOSTNAME" 1 21 22 45 0 \
+        2>&1 1>&3 > $WIZARDTMP`
+subreturn=$?
+exec 3>&-
+     SETVAR "DHCPHOSTNAME"
+     case $subreturn in
+     0) services_main;;
+     1) quit;;
+     3) choose_main;;
+     esac
+done
+}
+
+choose_main() {
+while : ; do
+subreturn=0
+exec 3>&1
+DHCPITEM=off;STATICITEM=off;PPPOEITEM=off;PPPITEM=off
+case $INETTYPE in
+     ETHERNET_STATIC) STATICITEM=on;;
+     PPPOE) PPPOEITEM=on;;
+     PPP) PPPITEM=on;;
+     *) DHCPITEM=on;;
+esac
+value=`$DIALOG --clear \
+               --backtitle "$WIZARDTITLE" \
+               --title "Step 2" \
+               --ok-label "Next" \
+               --extra-button --extra-label "Back" \
+               --radiolist "Choose Internet Connection Type:" 12 50 4\
+               "DHCP  " "DHCP Assigned Address" $DHCPITEM \
+               "STATIC" "Static IP Configuration" $STATICITEM \
+               "PPPOE " "PPPoe - DSL" $PPPOEITEM \
+               "PPP   " "PPP - Modem Dialup" $PPPITEM \
+               2>&1 1>&3`
+subreturn=$?
+exec 3>&-
+     case $subreturn in
+     0) SETCONNTYPE $value
+        case $value in
+             DHCP) choose_interface "INET" "Internet NIC Interface";dhcp_main;;
+             STATIC) choose_interface "INET" "Internet NIC Interface";static_main;;
+             PPPOE) choose_interface "INET" "Internet NIC Interface";pppoe_main;;
+             PPP) ppp_main;;
+        esac;;
+     1) quit;;
+     3) local_main;;
+     esac
+done
+}
+
+local_main() {
+while : ; do
+subreturn=0
+exec 3>&1
+value=`$DIALOG --clear \
+        --stdout \
+        --backtitle "$WIZARDTITLE" \
+        --title "Step 1" \
+        --ok-label "Next" \
+        --mixedform "Local Network Configuration" 10 42 0 \
+        "Local IP Address.:" 1 1 "$LOCAL_IPADDR" 1 20 15 0 0 \
+        "Local NetMask....:" 2 1 "$LOCAL_NETMASK" 2 20 15 0 0 2>&1 1>&3 > $WIZARDTMP`
+subreturn=$?
+exec 3>&-
+     case $subreturn in
+     1) quit ;;
+     0) SETVAR "LOCAL_IPADDR,LOCAL_NETMASK"
+        choose_interface "LOCAL" "Local Network Interface"
+        choose_main;;
+     esac
+done
+}
+
+welcome() {
+$DIALOG --clear \
+        --backtitle "$WIZARDTITLE" \
+        --title "Wizard guide" \
+        --msgbox "This Wizard will guide you to configure your BrazilFW.\nFor more information visit the project page at\nhttp://www.brazilfw.com.br" 15 60
+        local_main
+}
+
+choose_interface() {
+IFCONFIG=`ifconfig -a | sed '/^imq*/d;/^lo\>/d;/^bond*/d;/gre*/d;/^[ ]/d;/^$/d;s/\ .*//g;s/^/ /g' | sed ';:a;$!N;s/\n//;ta;s/^ //'`
+ccount=0;for lcount in $IFCONFIG; do ccount=$((ccount+1));done
+lcount=1
+subreturn=0
+exec 3>&1
+
+if [ "$1" = "LOCAL" ]; then
+   if [ -n "$IF_LOCAL" ]; then
+      DEFAULTITEM="$IF_LOCAL"
+   else
+      DEFAULTITEM="None"
+   fi
+else
+   if [ -n "$IF_INET" ]; then
+      DEFAULTITEM="$IF_INET"
+   else
+      DEFAULTITEM="None"
+   fi
+fi
+value=`eval \
+        $DIALOG --clear \
+        --no-cancel --default-item \"$DEFAULTITEM\" \
+        --backtitle \"$WIZARDTITLE\" \
+        --title \"Choose Interface\" \
+        --menu \"$2\" 12 48 7\ $(
+        for INTERFACE in $IFCONFIG; do
+        #[ "$ccount" -gt "$lcount" ] && NEXTLINE="\134" || NEXTLINE=""
+        echo -e \"$INTERFACE\" \"$(INTERFACE_NAME "$INTERFACE")\"" \134"
+        lcount=$((lcount+1))
+        done
+        echo -e \"None\" \"None\"
+        ) 2>&1 1>&3`
+subreturn=$?
+exec 3>&-
+[ "$value" = "None" ] && value=""
+case $subreturn in
+     0)[ "$1" = "LOCAL" ] && IF_LOCAL=$value || IF_INET=$value;;
+esac
+}
+#network_main() {
+#while : ; do
+#subreturn=0
+#exec 3>&1
+#value=`$DIALOG --clear \
+#        --backtitle "$WIZARDTITLE" \
+#        --title "Step 4" \
+#        --ok-label "Next" \
+#        --cancel-label "Cancel" \
+#        --help-button --help-label "Change" \
+#        --extra-button --extra-label "Back" \
+#        --menu "Network Configuration" 7 40 0\
+#        "Local Network Interface" "[$IF_LOCAL]"\
+#        "Internet NIC Interface " "[$IF_INET]" 2>&1 1>&3`
+#subreturn=$?
+#exec 3>&-
+#     case $subreturn in
+#     0) services_main ;;
+#     1) quit ;;
+#     3) 
+#        case $INETTYPE in
+#             ETHERNET_STATIC) static_main;;
+#             PPPOE) pppoe_main;;
+#             PPP) ppp_main;;
+#             *) dhcp_main;;
+#        esac;;
+#     esac   
+#    
+#     case $value in
+#     "HELP Local"*) choose_interface "LOCAL" "Local Network Interface";;
+#     "HELP Internet"*) choose_interface "INET" "Internet NIC Interface";;
+#     esac
+#done
+#}
+
+services_main() {
+VAR_STEP=6
+while : ; do
+SERVDHCP=off;SERVSSH=off
+[ "$DHCPSERVER" = "YES" ] && SERVDHCP=on
+[ "$ENABLE_EXTERNAL_SSH" = "YES" ] && SERVSSH=on
+subresult=0
+exec 3>&1
+value=`$DIALOG --clear \
+        --backtitle "$WIZARDTITLE" \
+        --title "Step 5" \
+        --ok-label "Next" \
+        --extra-button --extra-label "Back" \
+        --checklist "Services" 7 58 0\
+        "DHCP" "Enable BrazilFW Internal DHCP Server " $SERVDHCP \
+        "SSH" "Enable external access to SSH Service" $SERVSSH 2>&1 1>&3`
+subresult=$?
+exec 3>&-
+SERVDHCP=`echo $value | grep -c -i "DHCP"`
+SERVSSH=`echo $value | grep -c -i "SSH"`
+[ "$SERVDHCP" = 1 ] && DHCPSERVER='YES' || DHCPSERVER='NO'
+[ "$SERVSSH" = 1 ] && ENABLE_EXTERNAL_SSH='YES' || ENABLE_EXTERNAL_SSH='NO'
+case $subresult in
+     0) dhcpd_main;;
+     1) quit;;
+     3) case $INETTYPE in
+             ETHERNET_STATIC) static_main;;
+             PPPOE) pppoe_main;;
+             PPP) ppp_main;;
+             *) dhcp_main;;
+        esac;;
+esac
+done
+}
+dhcpd_main() {
+if [ "$DHCPSERVER" = "YES" ]; then
+while : ; do
+subreturn=0
+exec 3>&1
+value=`$DIALOG --clear \
+        --stdout \
+        --backtitle "$WIZARDTITLE" \
+        --title "Step $VAR_STEP" \
+        --ok-label "Next" \
+        --extra-button --extra-label "Back" \
+        --mixedform "DHCP Server Configuration" 0 0 0 \
+        "Starting IP Address.:" 1 1 "$DHCPD_START_IP" 1 23 22 45 0 \
+        "Ending IP Address...:" 2 1 "$DHCPD_END_IP" 2 23 22 45 0 \
+         2>&1 1>&3 > $WIZARDTMP`
+subreturn=$?
+exec 3>&-
+     SETVAR "DHCPD_START_IP,DHCPD_END_IP"
+     case $subreturn in
+     0) VAR_STEP=$((VAR_STEP+1)) 
+        [ "$WIZARD_TYPE" = 1 ] && password_main || finish_main
+        ;;
+     1) quit;;
+     3) services_main;;
+     esac
+done
+else
+[ "$WIZARD_TYPE" = 1 ] && password_main || finish_main
+fi
+
+}
+
+password_main() {
+while : ; do
+subreturn=0
+exec 3>&1
+value=`$DIALOG --clear \
+        --stdout \
+        --backtitle "$WIZARDTITLE" \
+        --title "Step $VAR_STEP" \
+        --ok-label "Next" \
+        --extra-button --extra-label "Back" \
+        --insecure \
+        --mixedform "Set Password system:" 0 0 0 \
+        "Type Your Password....:" 1 1 "$VAR_PASSWORD1" 1 25 22 45 1 \
+        "Confirm Your Password.:" 2 1 "$VAR_PASSWORD2" 2 25 22 45 1 \
+         2>&1 1>&3 > $WIZARDTMP`
+subreturn=$?
+exec 3>&-
+     SETVAR "VAR_PASSWORD1,VAR_PASSWORD2"
+     case $subreturn in
+     0) 
+       if [ "$VAR_PASSWORD1" != "$VAR_PASSWORD2" ]; then
+           $DIALOG --clear \
+                   --backtitle "$WIZARDTITLE" \
+                   --title "Wizard" \
+                   --msgbox "The password do not match!" 6 35
+                   VAR_PASSWORD1="";VAR_PASSWORD2=""
+        else
+           if [ -z "$VAR_PASSWORD1" ]; then
+              subreturn=0
+              $DIALOG --clear \
+                      --stdout \
+                      --backtitle "$WIZARDTITLE" \
+                      --title "Wizard" \
+                      --yesno "Password is blank continue?" 6 35
+              subreturn=$?
+              case $subreturn in
+                   0) CONTINUE=1 ;;
+                   1) CONTINUE=0 ;;
+              esac
+           else
+              CONTINUE=1
+           fi     
+           
+           if [ "$CONTINUE" = 1 ]; then
+              if [ -n "$VAR_PASSWORD1" ]; then
+                 cryptpassword=`echo $(/usr/bin/cryptpw "$VAR_PASSWORD1")`
+                 ADMIN_AUTH=`echo ${cryptpassword} | cut -b 5-`
+                 VAR_STEP=$((VAR_STEP+1))
+              else
+                 ADMIN_AUTH=""
+              fi
+              finish_main
+           fi        
+           
+        fi
+        ;;           
+     1) quit;;
+     3) VAR_STEP=$((VAR_STEP-1))
+        [ "$DHCPSERVER" = "YES" ] && dhcpd_main || services_main
+        ;;
+     esac
+done
+}
+
+report_main() {
+report_var=`echo -ne "          \Z2\ZuLocal Network Configuration\Zn
+Local IP Address.: $LOCAL_IPADDR
+Local NetMask....: $LOCAL_NETMASK
+Local Device.....: $IF_LOCAL
+              \Z2\ZuInternet Connection\Zn
+Connection Type..: $( case $INETTYPE in
+                          ETHERNET_STATIC) echo "Static IP";; 
+                          ETHERNET_DHCP) echo "DHCP Assigned Address";; 
+                          PPPOE) echo "PPPoE - DSL";;
+                          PPP) echo "PPP - Modem Dialup";;
+                    esac)
+$( case $INETTYPE in
+ETHERNET_STATIC)
+echo "IP Address.......: $IPADDR"
+echo "NetMask..........: $NETMASK"
+echo "Gateway..........: $GATEWAY"
+echo "DNS Primary......: $DNS1"
+echo "DNS Secundary....: $DNS2"
+echo "Hostname.........: $HOSTNAME"
+echo "Domain...........: $DOMAINNAME"
+echo "Internet Device..: $IF_INET"
+;;
+PPPOE)
+echo "Username.........: $PPPOE_USERNAME"
+echo "Password.........: $PPPOE_PASSWORD"
+echo "DNS Primary......: $DNS1"
+echo "DNS Secundary....: $DNS2"
+echo "Hostname.........: $HOSTNAME"
+echo "Domain...........: $DOMAINNAME"
+echo "Internet Device..: $IF_INET"
+;;
+PPP)
+echo "Username.........: $PPP_USERNAME"
+echo "Password.........: $PPP_PASSWORD"
+echo "Phone Number.....: $PPP_PHONENUM"
+echo "Comm Port........: $( case $PPP_MODEMTTY in
+                                 "/dev/ttys0") echo "COM1";;
+                                 "/dev/ttys1") echo "COM2";; 
+                                 "/dev/ttys2") echo "COM3";;                  
+                                 "/dev/ttys3") echo "COM4";;
+                                 "/dev/ttys4") echo "COM5";;
+                           esac)"
+echo "Modem Init String: $PPP_INITSTR"
+echo "Dialling Mode....: $( case $PPP_DEMANDDIAL in
+                                 NO) echo "Always Connected" ;;
+                                 MANUAL) echo "Manual Dialing" ;;
+                                 *) echo "Dial on Demand"
+                                    echo "On Demand Timeout: $PPP_DEMANDDIAL";;
+                          esac)"
+echo "DNS Primary......: $DNS1"
+echo "DNS Secundary....: $DNS2"
+echo "Hostname.........: $HOSTNAME"
+echo "Domain...........: $DOMAINNAME"
+;;
+ETHERNET_DHCP)
+[ "${#DHCPHOSTNAME}" -gt 0 ] && echo "DHCP Hostname....: $DHCPHOSTNAME"
+;;
+esac)
+          \Z2\ZuAdministrative Configuration\Zn
+External access to SSH.: $ENABLE_EXTERNAL_SSH
+Internal DHCP Server...: $DHCPSERVER
+$(if [ "$DHCPSERVER" = "YES" ]; then
+echo -n "Starting IP Address....: $DHCPD_START_IP
+Ending IP Address......: $DHCPD_END_IP"
+fi)
+$(if [ "$WIZARD_TYPE" = 1 ]; then
+echo "ROOT Password..........: $([ -n "$VAR_PASSWORD1" ] && echo "$VAR_PASSWORD1" || echo "Blank password !!!")"
+fi)
+"`
+$DIALOG --colors --backtitle "$WIZARDTITLE" --title "Wizard Information" --msgbox "$report_var" 16 50
+}
+           
+finish_main() {
+if [ "$WIZARD_TYPE" != 1 ]; then
+   while : ; do
+   exec 3>&1
+   value=`$DIALOG --clear \
+                  --backtitle "$WIZARDTITLE" \
+                  --title "Wizard Options" \
+                  --no-cancel \
+                  --menu "Congratulation. You have completed\nthe BrazilFW Wizard!\nChoose one option:" 9 40 0 \
+                 "1" "Save and Exit       " \
+                 "2" "Exit without Saving " \
+                 "3" "Back to last window " \
+                 "4" "Back to first window" \
+                 "5" "Wizard Information  " 2>&1 1>&3`
+   exec 3>&-        
+   case $value in
+        1) WRITECONFIG;;
+        2) quit ;;
+        3) if [ "$WIZARD_TYPE" = 1 ]; then
+              password_main
+           elif [ "DHCPSERVER" = "YES" ]; then
+              dhcpd_main
+           else
+              services_main
+           fi      
+           ;;
+        4) local_main;;
+        5) report_main ;;
+   esac
+   done
+else
+   WRITECONFIG
+fi
+}  
+
+WRITECONFIG() {
+WRITECONF "INETTYPE" "$INETTYPE"
+WRITECONF "LOCAL_IPADDR" "$LOCAL_IPADDR"
+WRITECONF "LOCAL_NETMASK" "$LOCAL_NETMASK"
+WRITECONF "IF_INET" "$IF_INET"
+WRITECONF "IF_LOCAL" "$IF_LOCAL"
+if [ "$WIZARD_TYPE" = 1 ]; then
+   WRITECONF "ADMIN_AUTH" "$ADMIN_AUTH"
+   sed -i s\~^root:.*$~root:"${cryptpassword}":10091:0:99999:7:::~g /etc/shadow
+fi
+case $INETTYPE in
+     ETHERNET_DHCP)
+             [ "${#DHCPHOSTNAME}" -gt 0 ] && WRITECONF "DHCPHOSTNAME" "$DHCPHOSTNAME"
+             ;;
+     PPPOE)
+             WRITECONF "PPPOE_USERNAME" "$PPPOE_USERNAME"
+             WRITECONF "PPPOE_PASSWORD" "$PPPOE_PASSWORD"
+             WRITECONF "PPPOE_IDLE" "$PPPOE_IDLE"
+             WRITECONF "DNS1" "$DNS1"
+             WRITECONF "DNS2" "$DNS2"
+             ;;
+     PPP)
+             WRITECONF "PPP_CONFIG_OTF" "$PPP_CONFIG_OTF"                
+             WRITECONF "PPP_DEMANDDIAL" "$PPP_DEMANDDIAL"
+             WRITECONF "PPP_MODEMTTY" "$PPP_MODEMTTY"
+             WRITECONF "PPP_INITSTR" "$PPP_INITSTR"
+             WRITECONF "PPP_PORTSPEED" "$PPP_PORTSPEED"
+             WRITECONF "PPP_ISP" "$PPP_ISP"
+             WRITECONF "PPP_CHATLOGIN" "$PPP_CHATLOGIN"
+             WRITECONF "PPP_STATICIP" "$PPP_STATICIP"
+             WRITECONF "PPP_USERNAME" "$PPP_USERNAME"
+             WRITECONF "PPP_PASSWORD" "$PPP_PASSWORD"
+             WRITECONF "PPP_PHONENUM" "$PPP_PHONENUM"
+             ;;
+     ETHERNET_STATIC)
+             WRITECONF "IPADDR" "$IPADDR"
+             WRITECONF "NETMASK" "$NETMASK"
+             WRITECONF "GATEWAY" "$GATEWAY"
+             WRITECONF "DNS1" "$DNS1"
+             WRITECONF "DNS2" "$DNS2"
+             ;;
+     esac                
+WRITECONF "HOSTNAME" "$HOSTNAME"
+WRITECONF "DOMAINNAME" "$DOMAINNAME"
+WRITECONF "DHCPSERVER" "$DHCPSERVER"
+WRITECONF "USE_DNS_CACHE" "$USE_DNS_CACHE"
+WRITECONF "DHCPD_START_IP" "$DHCPD_START_IP"
+WRITECONF "DHCPD_END_IP" "$DHCPD_END_IP"
+WRITECONF "ENABLE_EXTERNAL_SSH" "$ENABLE_EXTERNAL_SSH"
+WRITECONF "RUN_WIZARD" "NO"
+
+WAIT " " "Write configuration..." " "
+echo $COYOTECONF > $COYOTE
+
+if [ "$WIZARD_TYPE" = 1 ]; then
+
+   backup >/dev/null
+   WAIT ""
+   $DIALOG --clear \
+           --backtitle "$WIZARDTITLE" \
+           --title "Wizard guide" \
+           --msgbox "The settings have been saved.\nThe system will be restarted now." 6 40
+   clear
+   echo "" > /tmp/reboot.tmp
+   reboot
+   exit 0
+else
+   WAIT ""
+   $DIALOG --clear \
+           --backtitle "$WIZARDTITLE" \
+           --title "Wizard guide" \
+           --msgbox "To make the settings take effect!\nrun a backup and then reboot." 6 40
+   clear
+fi
+exit
+}
+
+welcome

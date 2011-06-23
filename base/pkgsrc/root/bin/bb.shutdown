@@ -1,0 +1,89 @@
+#!/bin/sh
+################################################
+# Shutdown script by Washington Rodrigues 2008 #
+################################################
+
+# Remove command prompt #
+export PS1=""
+
+# Wakeup BrazilFW #
+echo -e "\033[9;0]" > /dev/console
+
+if [ "$1" != "-w" ]; then
+clear
+RED=`echo -en "\\033[1;31m"`
+YELLOW=`echo -en "\\033[1;33m"`
+GREEN=`echo -en "\\033[1;32m"`
+NORMAL=`echo -en "\\033[0;39m"`
+BLUE=`echo -en "\\033[1;34m"`
+WHITE=`echo -en "\\033[1;15m"`
+PINK=`echo -en "\\033[0;35m"`
+fi
+
+centerscreen() {
+text=$1; lentext=${#text}; pos=$((40-$lentext/2))
+init_pos=1; space=""; while [ $init_pos -le $pos ]; do space=$space" "; init_pos=$((init_pos+1)); done
+echo "$space$1"
+}
+
+space() {
+lentext=`echo $1 | cut -c1-42`;lentextb=${#lentext};space=""
+[ "$lentextb" -le 42 ] && pos=$((42-$lentextb));init_pos=1; while [ $init_pos -le $pos ]; do space=$space" "; init_pos=$((init_pos+1)); done
+echo -n "$lentext$space"
+}
+
+call_script() {
+init_string="[$BLUE$1$NORMAL] - "
+init_title=`cat $2 | grep "#TITLE=" | cut -f2 -d"="`
+if [ ! -z "$init_title" ]; then
+   init_title="$init_title"
+else
+   init_title="$2"
+   [ "$2" = "/usr/sbin/ppp.hangup" ] && init_title="Hangup pppoe..."
+fi
+
+echo -n "          "$init_string""; echo -n "$YELLOW"; space "$init_title" ; 
+/bin/sh -c $2 2>/dev/null 1>/dev/null
+donescript="DONE"
+echo "$NORMAL[$GREEN$donescript$NORMAL]"
+}
+
+echo -n "$RED"
+centerscreen "¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤"
+centerscreen "¤     BrazilFW shutdown system 1.0     ¤"
+centerscreen "¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤"
+echo "$NORMAL"
+
+Ccount=1
+echo -n "$WHITE" 
+centerscreen "Stopping addons..."
+echo "$NORMAL"
+for SDS in `ls /etc/rc.d/pkgs/sd.*`;do [ -x $SDS ] && call_script $Ccount "$SDS"; Ccount=$((Ccount+1)); done 2> /dev/null
+echo ""
+echo -n "$WHITE" 
+centerscreen "Stopping other(s) service(s)..."
+echo "$NORMAL"    
+
+#KILL ppp
+if [ -f /var/run/ppp0.pid ]; then
+   call_script $Ccount "/usr/sbin/ppp.hangup"; Ccount=$((Ccount+1))
+fi
+echo
+#Umount /mnt
+mount | grep "mnt" >/dev/null
+if [ $? = 0 ]; then
+echo -n "$PINK                "; space "Unmount /mnt"
+umount /mnt 2>/dev/null 1>/dev/null
+donescript="DONE"
+echo "$NORMAL[$GREEN$donescript$NORMAL]"
+fi
+#Umount /partition
+mount | grep "partition" >/dev/null
+if [ $? = 0 ]; then
+echo -n "$PINK                "; space "Unmount /partition"
+donescript="DONE"
+umount /partition 2>/dev/null 1>/dev/null
+echo "$NORMAL[$GREEN$donescript$NORMAL]"
+fi
+echo
+echo

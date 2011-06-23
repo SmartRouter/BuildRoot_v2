@@ -1,0 +1,44 @@
+#!/bin/sh
+# BrazilFW Load Balance Script
+# Claudio Roberto Cussuol - 07/14/2006
+# Changed to support Load Balance with IP Alias interfaces in IF_INET
+# by BFW user "marcos do vale" in 28-02-2008
+#	called by: rc.line_up
+
+IP="/usr/sbin/ip"
+#IP="echo ip"
+
+. /etc/coyote/coyote.conf
+. /tmp/netsubsys.state
+
+$IP ru add prio 50 table main
+$IP ro del default
+$IP ru add prio 222 table 222 #echo "Creating default route table"
+
+COMMAND="$IP ro add default table 222 proto static "
+
+balance() {
+ echo "Creating link $1 route table"
+ eval `ipcalc -p -n $3 $4`
+ COMMAND="$COMMAND nexthop via $5 dev $2 weight $6"
+ $IP ru add prio 20  fwmark $1 table 20"$1"
+ $IP ru add prio 20"$1" from ${NETWORK}/${PREFIX} table 20"$1"
+ $IP ro add default via $5 dev $2 src $3 proto static table 20"$1"
+ $IP ro append prohibit default table 20"$1" metric 1 proto static
+}
+
+[ -n "$IF_INET_LB1" ] && balance 1 $IF_INET $IPADDR $NETMASK $GATEWAY $INET_WEIGHT
+[ -n "$IF_INET_LB2" ] && balance 2 $IF_INET2 $INET2_IPADDR $INET2_NETMASK $INET2_GATEWAY $INET2_WEIGHT
+[ -n "$IF_INET_LB3" ] && balance 3 $IF_INET3 $INET3_IPADDR $INET3_NETMASK $INET3_GATEWAY $INET3_WEIGHT
+[ -n "$IF_INET_LB4" ] && balance 4 $IF_INET4 $INET4_IPADDR $INET4_NETMASK $INET4_GATEWAY $INET4_WEIGHT
+
+$COMMAND
+$IP ro flush cache
+
+$IP ro
+[ -n "$IPADDR" ] && $IP ro ls table 201
+[ -n "$INET2_IPADDR" ] && $IP ro ls table 202
+[ -n "$INET3_IPADDR" ] && $IP ro ls table 203
+[ -n "$INET4_IPADDR" ] && $IP ro ls table 204
+$IP ro ls table 222
+

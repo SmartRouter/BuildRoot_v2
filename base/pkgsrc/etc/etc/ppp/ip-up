@@ -1,0 +1,83 @@
+#!/bin/sh
+# Coyote PPP Dial-up ip-up script for pppoe/DSL
+#	called by: pppd  called after PPP connection is made
+# Created by: Michael Kablitz <mkab@deutschsoft.com> 04-11-2001
+# Changed by: Claudio Roberto Cussuol <claudio_cl@rictec.com.br> 08-07-2004
+
+DNS1=
+DNS2=
+. /etc/coyote/coyote.conf
+FORCE_DNS=NO
+[ -n "$DNS1" ] && FORCE_DNS=YES
+
+iptables="/usr/sbin/iptables"
+tc="/usr/sbin/tc"
+
+logger -p daemon.info -t ip-up "ip-up script called with: ${@}"
+
+[ "$6" ] && { /etc/ppp/"$6"-up "$1" "$2" "$3" "$4" "$5"; exit 0; }
+
+while ! [ -e /tmp/ready ] ; do
+  sleep 1
+done
+
+if [ -e /tmp/netsubsys.state ]; then
+  . /tmp/netsubsys.state
+fi
+
+# This code allows automatic configuration of your resolv.conf
+# for peer supplied DNS addresses.
+# Original resolv.conf is restored when ip-down is called
+# by pppd when the link goes down.
+#
+if [ "$FORCE_DNS" = "NO" ] ; then
+  rm -f /etc/ppp/resolv.prev
+  RESOLVFILE="/etc/resolv.conf"
+  [ "$USE_DNS_CACHE" = "YES" ] && RESOLVFILE="/etc/resolv.dns"
+
+  if [ -f $RESOLVFILE ]; then
+	cp -p $RESOLVFILE /etc/ppp/resolv.prev
+	# Kludge for missing -m option in busybox "grep"
+	rm $RESOLVFILE
+	grep domain /etc/ppp/resolv.prev | while read ALINE; do
+		echo $ALINE > $RESOLVFILE
+		break
+	done
+	grep search /etc/ppp/resolv.prev | while read ALINE; do
+		echo $ALINE >> $RESOLVFILE
+		break
+	done
+	cat /etc/ppp/resolv.conf         >> $RESOLVFILE
+  else
+	cp -p /etc/ppp/resolv.conf $RESOLVFILE
+  fi
+  chmod go+r $RESOLVFILE
+
+  COUNT=1
+  rm -rf /tmp/realdns* > /dev/null
+  grep nameserver $RESOLVFILE | while read ALINE ; do
+     echo `echo $ALINE | cut -f 2 -d \ ` > /tmp/realdns$COUNT
+     COUNT=$((COUNT+1))
+  done
+
+  if [ -e /var/run/dnsmasq.pid ] ; then
+     kill -hup `cat /var/run/dnsmasq.pid`
+     sleep 2  # give the dnsmasq the chance to goes up
+  fi
+else
+  logger "Dns server forced by manual configuration"
+fi
+
+CONNECTTIME=`date`
+CONNECTSTRING=`cat /etc/ppp/connect-errors | grep CONNECT | cut -b 24-`
+INET_UP=UP
+
+cat /etc/ppp/connect-errors | logger
+rm /etc/ppp/connect-errors
+
+. /usr/sbin/write_state.sh
+
+# Call the firewall script after the IP link comes up
+. /etc/rc.d/rc.line_up $1
+
+exit 0

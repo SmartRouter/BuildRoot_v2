@@ -1,0 +1,99 @@
+#!/bin/sh
+#
+# Coyote QOS init Script
+# Author: Dolly <dolly@czi.cz>
+# Revision by BFW user "marcos do vale" - 02/04/2008
+
+# Load default QOS values
+. /etc/qos.config
+
+# always Load Coyote variables, overwrite defaults
+. /etc/coyote/coyote.conf
+
+iptables="/usr/sbin/iptables"
+tc="/usr/sbin/tc"
+ip="/bin/ip"
+
+[ -e /tmp/netsubsys.state ] && . /tmp/netsubsys.state
+
+if [ -z "$IF_INET" ]; then
+ if [ "$INETTYPE" != "PPPOE" ] && [ "$INETTYPE" != "PPP" ]; then
+       IF_INET=eth1
+ else
+	IF_INET=ppp0
+ fi
+ logger -p daemon.info -t rc.qos "QOS script called with default: ${IF_INET}"
+else
+ [ "$INETTYPE" = "PPPOE" -o "$INETTYPE" = "PPP" ] && IF_INET=ppp0
+ logger -p daemon.info -t rc.qos "QOS script called with: ${IF_INET}"
+fi
+                                                                                        
+DOWNSTREAM_JUNK=$(percentage $QOS_DOWNSTREAM $QOS_DOWNSTREAM_JUNK)
+UPSTREAM_JUNK=$(percentage $QOS_UPSTREAM $QOS_UPSTREAM_JUNK)
+UP_FW_STREAM=$(percentage $QOS_UPSTREAM $QOS_UPFW_STREAM)
+UPSTREAM_JUNK=$(percentage $QOS_UPSTREAM $QOS_UPSTREAM_JUNK)
+DOWNSTREAM_JUNK=$(percentage $QOS_DOWNSTREAM $QOS_DOWNSTREAM_JUNK)
+CLEAR_UPSTREAM=$((${QOS_UPSTREAM}-${UPSTREAM_JUNK}))
+CLEAR_DOWNSTREAM=$((${QOS_DOWNSTREAM}-${DOWNSTREAM_JUNK}))
+COMP_DOWN=$(percentage $CLEAR_DOWNSTREAM $QOS_DOWNSTREAM_INDIVIDUAL)
+COMP_UP=$(percentage $CLEAR_UPSTREAM $QOS_UPSTREAM_INDIVIDUAL)
+
+# Clean Subnet QOS Chain
+$iptables -t mangle -F PREROUTING
+$iptables -t mangle -F Subnet_qos
+
+# Flush rules
+
+QOS_flush() {
+echo "* Deleting old QOS classes in $1 Interface..."
+$tc qdisc  del dev $1 root 2> /dev/null
+$tc qdisc  del dev $1 ingress 2> /dev/null
+
+echo "* Deleting old root filters in $1 Interface..."
+$tc filter del dev $1 parent 1:2  pref 100  2>/dev/null
+$tc filter del dev $1 parent 1:1  pref 100  2>/dev/null
+$tc filter del dev $1 parent 1:   pref 100  2>/dev/null
+}
+
+QOS_flush $IF_INET
+QOS_flush $IF_LOCAL
+[ -n "$IF_LOCAL2" ] && QOS_flush $IF_LOCAL2
+[ -n "$IF_LOCAL3" ] && QOS_flush $IF_LOCAL3
+[ -n "$IF_LOCAL4" ] && QOS_flush $IF_LOCAL4
+[ -n "$IF_WLAN" ] && QOS_flush $IF_WLAN
+[ -n "$IF_DMZ" ] && QOS_flush $IF_DMZ
+
+$ip link | grep imq | grep UP >/dev/null
+if [ $? = 0 ]; then
+ $tc qdisc del dev imq0 root
+ $tc qdisc del dev imq1 root
+ $ip link set imq0 down
+ $ip link set imq1 down
+ $iptables -t mangle -D PREROUTING  -i $IF_LOCAL -j IMQ --todev 0
+ $iptables -t mangle -D POSTROUTING -o $IF_LOCAL -j IMQ --todev 1
+
+ [ -n "$IF_LOCAL2" ] && { $iptables -t mangle -D PREROUTING  -i $IF_LOCAL2 -j IMQ --todev 0;
+	$iptables -t mangle -D POSTROUTING -o $IF_LOCAL2 -j IMQ --todev 1; }
+ [ -n "$IF_LOCAL3" ] && { $iptables -t mangle -D PREROUTING  -i $IF_LOCAL3 -j IMQ --todev 0;
+	$iptables -t mangle -D POSTROUTING -o $IF_LOCAL3 -j IMQ --todev 1; }
+ [ -n "$IF_LOCAL4" ] && { $iptables -t mangle -D PREROUTING  -i $IF_LOCAL4 -j IMQ --todev 0;
+	$iptables -t mangle -D POSTROUTING -o $IF_LOCAL4 -j IMQ --todev 1; }
+fi
+
+case "$QOS_TYPE" in
+ WONDERSHAPER)
+	echo "QOS: Attention: Wonder-shaper QOS scripts are not supported anymore... sorry.";;
+ CUSTOM)
+	echo "QOS: using Custom QOS script."
+	[ -x /etc/rc.d/rc.qos.custom ] && . /etc/rc.d/rc.qos.custom
+	echo "QOS: init complete";;
+ SUBNET)
+	echo "QOS: using Subnet QOS script."
+	[ -x /etc/rc.d/rc.qos.subnet ] && . /etc/rc.d/rc.qos.subnet
+	echo "QOS: init complete";;
+ COYOTE_DEFAULT|COYOTE_MANUAL)
+	echo "QOS: using Coyote QOS init scripts ..."
+	[ -x /etc/rc.d/rc.qos.coyote ] && . /etc/rc.d/rc.qos.coyote
+	echo "QOS: init complete";;
+ *) echo "QOS: QOS installed, but disabled  ...";;
+esac

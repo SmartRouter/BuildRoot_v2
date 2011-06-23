@@ -1,0 +1,53 @@
+#!/bin/sh
+# Retorna informações sobre as placas de rede
+#
+
+for IFACE in `ifconfig -a |grep ^"[ea]th" |cut -d " " -f 1`; do
+#echo 1
+  TMP=`ifconfig $IFACE |head -n 1`      #Interface e MAC
+#  L_IFACE=`echo $TMP |cut -d ":" -f 1`  #Linha da Inteface
+  MAC=`    echo $TMP |cut -d " " -f 5`  #Enderecao MAC
+#echo 11
+  if ifconfig $IFACE |grep -qs UP; then #Estado
+    STATE="UP"
+  else
+    STATE="DOWN"
+  fi
+  TMP=`ifconfig $IFACE |grep Bcast` #Ip, Broadcast e mascara
+#echo 12
+  if [ "$STATE" = "UP" ]; then            #Endereço IP
+    ADDR=` echo $TMP |cut -d ":" -f 2 |cut -d " " -f 1`
+    BCAST=`echo $TMP |cut -d ":" -f 3 |cut -d " " -f 1`
+    MASK=` echo $TMP |cut -d ":" -f 4 |cut -d " " -f 1`
+  else
+    ADDR=""
+    BCAST=""
+    MASK=""
+  fi  
+ 
+  TMP=`ifconfig $IFACE |grep Interr` #IRQ e Addr
+  IRQ=`echo $TMP |cut -d ":" -f 2 |cut -d " " -f 1`
+  BADDR=`echo $TMP |cut -d ":" -f 3`
+
+  #Acha o PCI-ID da Interface
+  for I in `grep -n "Ethernet" /proc/pci |cut -d ":" -f 1`; do
+    TMP=`cat /proc/pci |head -n $((I+1)) |tail -n 1 |cut -d " " -f 8 |cut -d "." -f 1`
+    if [ $TMP = $IRQ ]; then
+      DEVICE=`cat /proc/pci |head -n $I |tail -n 1|cut -d ":" -f 2`
+    fi
+  done
+  
+  MODULO=`ethtool -i $IFACE |grep driver |cut -d: -f2`
+  
+  echo "---------------------------------------------------------------------"
+  echo "Interface.: "$IFACE
+  echo "Estado....: "$STATE
+  echo "MAC.......: "$MAC
+  echo "Address...: "$ADDR
+  echo "Broadcast.: "$BCAST
+  echo "Mask......: "$MASK
+  echo "IRQ.......: "$IRQ" / Base address: "$BADDR
+  echo "Device....:"$DEVICE
+  echo "Modulo....:"$MODULO
+  echo "---------------------------------------------------------------------"
+done

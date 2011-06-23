@@ -1,0 +1,23 @@
+
+cd /dev/
+
+#Default
+chown root.root * >null 2>&1
+
+chown root.tty tty* >null 2>&1
+chown root.root tty >null 2>&1
+chown root.dialout ttyS* >null 2>&1
+
+chown root.disk hd* >null 2>&1
+chown root.disk sd* >null 2>&1
+chown root.disk ram* >null 2>&1
+chown root.disk loop* >null 2>&1
+chown root.disk initrd >null 2>&1
+
+chown root.floppy fd0* >null 2>&1
+
+chown root.kmem mem >null 2>&1
+chown root.kmem kmem >null 2>&1
+chown root.kmem port >null 2>&1
+
+cd /

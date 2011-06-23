@@ -1,0 +1,232 @@
+#!/bin/sh
+# Ip Addresses Tests
+# Claudio Roberto Cussuol - 04/15/2006
+
+. /etc/coyote/coyote.conf
+. /tmp/netsubsys.state
+
+[ "$INETTYPE" = "PPP" -o "$INETTYPE" = "PPPOE" ] && IF_INET=ppp0
+
+ANY_ERROR=0
+if [ -z "$1" ]; then
+ RED=`echo -en "\\033[1;31m"`
+ YELLOW=`echo -en "\\033[1;33m"`
+ GREEN=`echo -en "\\033[1;32m"`
+ NORM=`echo -en "\\033[0;39m"`
+fi
+
+[ $INET_UP = UP ] && UP=1 || UP=0
+
+ip_to_int() {
+ if [ -n "$1" ] ; then
+	P1=`echo $1 | cut -f 1 -d .`
+	P2=`echo $1 | cut -f 2 -d .`
+	P3=`echo $1 | cut -f 3 -d .`
+	P4=`echo $1 | cut -f 4 -d .`
+	echo -n $((($P1<<24)+($P2<<16)+($P3<<8)+$P4))
+ else
+	echo -n 0
+ fi
+}
+
+is_inside() {
+ if [ "$4" = "up_only" -a "$UP" = 0 ] ; then
+	echo -n 2
+ else
+	eval `ipcalc -b -n $1 $2`
+	VBEG=`ip_to_int $NETWORK`
+	VEND=`ip_to_int $BROADCAST`
+	VIP=`ip_to_int $3`
+	if [ $VIP -ge $VBEG -a $VIP -le $VEND ] ; then
+	 echo -n 1
+	else
+	 echo -n 0
+	fi
+ fi
+}
+
+is_internal() {
+ if [ "$2" = "up_only" -a "$UP" = 0 ] ; then
+	echo -n 2
+ else
+	P1=`echo $1 | cut -f 1 -d .`
+	P2=`echo $1 | cut -f 2 -d .`
+	if [ $P1 = 10 ] ; then
+	 echo -n 0
+	elif [ $P1 = 172 -a $P2 -ge 16 -a $P2 -le 31 ] ; then
+	 echo -n 0
+	elif [ $P1 = 192 -a $P2 = 168 ] ; then
+	 echo -n 0
+	else
+	 echo -n 1
+	fi
+ fi
+}
+
+write_test() {
+ echo -n "$TEST ["
+ if [ $RESULT = 2 ] ; then
+	echo -n "${YELLOW}NOT CONNECTED${NORM}"
+ else
+	if [ $RESULT = $1 ] ; then
+	 echo -n "${GREEN}OK${NORM}"
+	else
+	 echo -n "${RED}FAIL${NORM}"
+	 [ -z "$2" ] && ANY_ERROR=1
+	fi
+ fi
+ echo "]"
+}
+
+TEST="Checking if you are connected to the Internet         "
+RESULT=$UP
+[ $UP = 0 ]&&RESULT=2
+write_test 1 no_conflict
+
+if [ $INET_UP = UP ] ; then
+ if [ "$INETTYPE" = "PPP" -o "$INETTYPE" = "PPPOE" ] ; then
+	IF_INET=ppp0
+	GATEWAY=`ifconfig ppp0 | grep P-t-P`
+	GATEWAY=`echo $GATEWAY | cut -f 3 -d " "`
+	GATEWAY=`echo $GATEWAY | cut -f 2 -d :`
+ elif [ "$INETTYPE" = "ETHERNET_DHCP" ] ; then
+	. /etc/dhcpc/$IF_INET.info
+	GATEWAY=$dhcp_router
+	IPADDR=`getifaddr $IF_INET`
+	NETMASK=`getifaddr $IF_INET -m`
+ fi
+else
+ IPADDR=0.0.0.0
+ NETMASK=0.0.0.0
+ GATEWAY=0.0.0.0
+fi
+
+if [ "$1" != "-i" ] ; then
+ TEST="Checking if your Gateway is responding                "
+ if [ $UP = 0 ] ; then
+	RESULT=2
+ else
+	gateway.test > /dev/null 2> /dev/null
+	RESULT=$?
+ fi
+ write_test 0 no_conflict
+
+ TEST="Checking if your DNS is working                       "
+ if [ $UP = 0 ] ; then
+	RESULT=2
+ else
+	dns.test > /dev/null 2> /dev/null
+	RESULT=$?
+ fi
+ write_test 0 no_conflict
+fi
+
+if [ "$INETTYPE" = "ETHERNET_STATIC" -o "$INETTYPE" = "ETHERNET_DHCP" ] ; then
+  TEST="Checking if Gateway Address is in Internet network    "
+  RESULT=`is_inside $IPADDR $NETMASK $GATEWAY up_only`
+  write_test 1
+fi
+
+if [ "$INETTYPE" = "ETHERNET_STATIC" -o "$INETTYPE" = "ETHERNET_DHCP" ] ; then
+  TEST="Checking if Local IP is not in Internet network       "
+  RESULT=`is_inside $IPADDR $NETMASK $LOCAL_IPADDR up_only`
+  write_test 0
+
+  TEST="Checking if Internet IP is not in Local network       "
+  RESULT=`is_inside $LOCAL_IPADDR $LOCAL_NETMASK $IPADDR up_only`
+  write_test 0
+fi  
+
+TEST="Checking if Local IP follows Internal IP Standards    "
+RESULT=`is_internal $LOCAL_IPADDR`
+write_test 0
+
+if [ -n "$DMZ_IPADDR" ] ; then
+  if [ "$INETTYPE" = "ETHERNET_STATIC" -o "$INETTYPE" = "ETHERNET_DHCP" ] ; then
+    TEST="Checking if DMZ IP is not in Internet network         "
+    RESULT=`is_inside $IPADDR $NETMASK $DMZ_IPADDR up_only`
+    write_test 0
+
+    TEST="Checking if Internet IP is not in DMZ network         "
+    RESULT=`is_inside $DMZ_IPADDR $DMZ_NETMASK $IPADDR up_only`
+    write_test 0
+  fi
+
+  TEST="Checking if DMZ IP is not in Local network            "
+  RESULT=`is_inside $LOCAL_IPADDR $LOCAL_NETMASK $DMZ_IPADDR`
+  write_test 0
+
+  TEST="Checking if Local IP is not in DMZ network            "
+  RESULT=`is_inside $DMZ_IPADDR $DMZ_NETMASK $LOCAL_IPADDR`
+  write_test 0
+
+  TEST="Checking if DMZ IP follows Internal IP Standards      "
+  RESULT=`is_internal $DMZ_IPADDR`
+  write_test 0
+fi
+
+if [ -n "$LOCAL2_IPADDR" ] ; then
+  if [ "$INETTYPE" = "ETHERNET_STATIC" -o "$INETTYPE" = "ETHERNET_DHCP" ] ; then
+    TEST="Checking if LAN2 IP is not in Internet network        "
+    RESULT=`is_inside $IPADDR $NETMASK $LOCAL2_IPADDR up_only`
+    write_test 0
+
+    TEST="Checking if Internet IP is not in LAN2 network        "
+    RESULT=`is_inside $LOCAL2_IPADDR $LOCAL2_NETMASK $IPADDR up_only`
+    write_test 0
+  fi
+
+  TEST="Checking if LAN2 IP follows Internal IP Standards     "
+  RESULT=`is_internal $LOCAL2_IPADDR`
+  write_test 0
+fi
+
+if [ -n "$LOCAL3_IPADDR" ] ; then
+  if [ "$INETTYPE" = "ETHERNET_STATIC" -o "$INETTYPE" = "ETHERNET_DHCP" ] ; then
+    TEST="Checking if LAN3 IP is not in Internet network        "
+    RESULT=`is_inside $IPADDR $NETMASK $LOCAL3_IPADDR up_only`
+    write_test 0
+
+    TEST="Checking if Internet IP is not in LAN3 network        "
+    RESULT=`is_inside $LOCAL3_IPADDR $LOCAL3_NETMASK $IPADDR up_only`
+    write_test 0
+  fi
+
+  TEST="Checking if LAN3 IP follows Internal IP Standards     "
+  RESULT=`is_internal $LOCAL3_IPADDR`
+  write_test 0
+fi
+
+if [ -n "$LOCAL4_IPADDR" ] ; then
+  if [ "$INETTYPE" = "ETHERNET_STATIC" -o "$INETTYPE" = "ETHERNET_DHCP" ] ; then
+    TEST="Checking if LAN4 IP is not in Internet network        "
+    RESULT=`is_inside $IPADDR $NETMASK $LOCAL4_IPADDR up_only`
+    write_test 0
+
+    TEST="Checking if Internet IP is not in LAN4 network        "
+    RESULT=`is_inside $LOCAL4_IPADDR $LOCAL4_NETMASK $IPADDR up_only`
+    write_test 0
+  fi
+
+  TEST="Checking if LAN4 IP follows Internal IP Standards     "
+  RESULT=`is_internal $LOCAL4_IPADDR`
+  write_test 0
+fi
+
+if [ -n "$WLAN_IPADDR" ] ; then
+  if [ "$INETTYPE" = "ETHERNET_STATIC" -o "$INETTYPE" = "ETHERNET_DHCP" ] ; then
+    TEST="Checking if WLAN IP is not in Internet network        "
+    RESULT=`is_inside $IPADDR $NETMASK $WLAN_IPADDR up_only`
+    write_test 0
+
+    TEST="Checking if Internet IP is not in WLAN network        "
+    RESULT=`is_inside $WLAN_IPADDR $WLAN_NETMASK $IPADDR up_only`
+    write_test 0
+  fi
+
+  TEST="Checking if WLAN IP follows Internal IP Standards     "
+  RESULT=`is_internal $WLAN_IPADDR`
+  write_test 0
+fi
+
+[ $ANY_ERROR = 0 ] && exit 0 || exit 1

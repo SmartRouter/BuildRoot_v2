@@ -1,0 +1,6 @@
+/sbin/iwconfig
+/sbin/iwpriv
+/sbin/iwlist
+/sbin/ifrename
+/lib/libiw.so.28
+/var/lib/lrpkg/iwtools.list

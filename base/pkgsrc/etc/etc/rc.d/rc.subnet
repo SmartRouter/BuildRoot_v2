@@ -1,0 +1,61 @@
+#!/bin/sh
+# BrazilFW Subnetting Startup Script
+# Author: Claudio Roberto Cussuol - 02/28/2006
+# Changed to support subnet QOS in others LAN interfaces
+# by BFW user "agsoliveira" - Revision by BFW user "marcos do vale" - 08/04/2008
+# Call by /etc/rc.d/rc.M in line 94
+
+. /etc/coyote/coyote.conf
+. /tmp/netsubsys.state
+
+IPTABLES="/usr/sbin/iptables"  
+ip="/usr/sbin/ip" 
+
+if [ "$INETTYPE" = "PPPOE" -o "$INETTYPE" = "PPP" ]; then
+ IF_INET=ppp0
+elif [ -z "$IF_INET" ]; then
+ IF_INET=eth1
+fi
+
+find_lan() {
+  case "$1" in
+	LAN1)	LAN=$IF_LOCAL ;;
+	LAN2)	LAN=$IF_LOCAL2 ;;
+	LAN3)	LAN=$IF_LOCAL3 ;;
+	LAN4)	LAN=$IF_LOCAL4 ;;
+	WLAN)	LAN=$IF_WLAN ;;
+	DMZ)	LAN=$IF_DMZ ;;
+	*)	LAN=$IF_LOCAL ;;
+  esac
+}
+
+subnet() {
+if [ "$1" = "Y" -o "$1" = "y" ]; then
+ ID=$2
+ IP=$3
+ MASK=$4
+ find_lan $11
+ [ -z $12 ] && LAN_ID=$ID || LAN_ID=$12
+ $ip addr add $IP/$MASK brd + dev $LAN label $LAN:$LAN_ID
+ echo -n "Create subnet $IP/$MASK"
+ if [ "$DISABLE_NAT" != "YES" ]; then
+  $IPTABLES -t nat -I subnets-masks -s $IP/$MASK -o $IF_INET -j MASQUERADE
+  echo " - MASQUERADE via $IF_INET"
+ fi
+fi
+}
+
+if [ -e /etc/coyote/subnet.cfg ]; then
+ echo "Starting Subnetting..."
+ echo "Removing Subnet ..."
+ $IPTABLES -t nat -F subnets-masks
+ $ip -s -s addr flush label $IF_LOCAL:*
+ [ ! -z $IF_LOCAL2 ] && $ip -s -s addr flush label $IF_LOCAL2:*
+ [ ! -z $IF_LOCAL3 ] && $ip -s -s addr flush label $IF_LOCAL3:*
+ [ ! -z $IF_LOCAL4 ] && $ip -s -s addr flush label $IF_LOCAL4:*
+ [ ! -z $IF_WLAN ] && $ip -s -s addr flush label $IF_WLAN:*
+ [ ! -z $IF_DMZ ] && $ip -s -s addr flush label $IF_DMZ:*
+ . /etc/coyote/subnet.cfg
+fi
+
+

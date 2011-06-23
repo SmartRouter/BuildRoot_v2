@@ -1,0 +1,4 @@
+/sbin/acpid
+/etc/acpi/*
+/etc/rc.d/pkgs/rc.acpid
+/var/lib/lrpkg/acpid.list

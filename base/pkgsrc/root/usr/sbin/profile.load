@@ -1,0 +1,119 @@
+#!/bin/sh
+#
+# Load Profiles Script for Coyote Linux
+# Author:  Claudio Roberto Cussuol  
+#          29/05/2005
+#
+
+PROFILES_DIR=/etc/coyote/profiles
+TMP_DIR=/tmp/profile_tmp_dir
+PROFILE_NAME=""
+
+RELOAD_FIREWALL=
+RELOAD_QOS=
+RELOAD_DHCP=
+#ASK_CONFIRM=
+ASK_CONFIRM=NO
+
+
+HELP=
+QUIET=NO
+
+show_usage() {
+  if [ -n "$QUIET" ] ; then
+    echo "profile.load   Load a saved profile to current configuration"
+    echo 
+    echo 'Usage:         profile.load [options] profile-name'
+    echo "Options:       --help  or -h          See this information"
+    echo "               --quiet or -q          Do not show messages"
+    echo "               --yes   or -y          Do not ask for confirmation"
+    echo "               --no_firewall_reload   Do not reload firewall"
+    echo "               --no_qos_reload        Do not reload qos"
+    echo "               --no_dhcp_reload       Do not reload dhcp server"
+  fi  
+}
+
+show_error() {
+  rm -rf $TMP_DIR > /dev/null
+  echo
+  echo ERROR: $1
+  exit 1 
+}
+
+while [ -n "$1" ] ; do
+  case "$1" in
+    -h|--help) HELP="YES" ; shift ;;
+    --no_firewall_reload) RELOAD_FIREWALL="NO" ; shift ;;
+    --no_qos_reload) RELOAD_QOS="NO" ; shift ;;
+    --no_dhcp_reload) RELOAD_DHCP="NO" ; shift ;;
+    --yes|-y) ASK_CONFIRM="NO" ; shift ;;
+    --help|-h) HELP="YES" ; shift ;;
+    --quiet|-q) QUIET="" ; shift ;;
+    *) PROFILE_NAME="$1"
+       shift ;;
+  esac
+done
+
+if [ -n "$HELP" ] ; then
+  show_usage
+  exit 0
+fi
+if [ -z "$PROFILE_NAME" ] ; then
+  show_usage
+  show_error "Mising profile name"
+fi
+if [ "`echo $PROFILE_NAME | cut -b 1`" = "-" ] ; then
+  show_usage
+  show_error "Invalid Option"
+fi
+
+PROFILE_NAME=`basename $PROFILE_NAME .prf`
+[ ! -e "$PROFILES_DIR/$PROFILE_NAME.prf" ] && show_error "Profile $PROFILE_NAME not found"
+
+if [ -z "$ASK_CONFIRM" ] ; then
+  echo "This will overwrite the current configuration."
+  echo -n "Are you sure you want to load the profile $PROFILE_NAME ? [N] - "
+  read YN
+  [ "$YN" != "Y" -a "$YN" != "y" ] && exit 0
+fi  
+
+[ -n "$QUIET" ] && echo Loading profile: $PROFILE_NAME
+rm -rf $TMP_DIR > /dev/null
+mkdir  $TMP_DIR > /dev/null
+[ $? != 0 ] && show_error "Unable to create temp directory" 
+
+HERE=`pwd`
+cd $TMP_DIR
+tar -xzf $PROFILES_DIR/$PROFILE_NAME.prf > /dev/null
+[ $? != 0 ] && show_error "Unable to uncompress profile files"  
+
+cat /var/lib/lrpkg/*.config_files | while read f; do
+  f1=`echo $f | cut -f 1 -d " "`
+  f2=`echo $f | cut -f 2 -d " "`
+  [ -n "$QUIET" ] && echo $f1
+  cat $f1 | dos2unix -u > /etc/coyote/$f2
+done
+
+cd $HERE
+rm -rf $TMP_DIR > /dev/null
+
+if [ -z "$RELOAD_FIREWALL" ] ; then
+  [ -n "$QUIET" ] && echo Reloading Firewall
+  [ -n "$QUIET" ] && firewall.reload
+  [ -z "$QUIET" ] && firewall.reload >> /dev/null
+fi
+if [ -z "$RELOAD_QOS" ] ; then
+  [ -n "$QUIET" ] && echo Reloading QOS
+  [ -n "$QUIET" ] && qos.reload
+  [ -z "$QUIET" ] && qos.reload >> /dev/null
+fi
+if [ -z "$RELOAD_DHCP" ] ; then
+  [ -n "$QUIET" ] && echo Reloading DHCP Server
+  [ -n "$QUIET" ] && dhcp.reload
+  [ -z "$QUIET" ] && dhcp.reload >> /dev/null
+fi
+[ -n "$QUIET" ] && echo Reloading CRON
+[ -n "$QUIET" ] && cron.reload
+[ -z "$QUIET" ] && cron.reload >> /dev/null
+
+[ -n "$QUIET" ] && echo Done

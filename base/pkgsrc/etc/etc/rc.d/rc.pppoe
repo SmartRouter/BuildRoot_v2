@@ -1,0 +1,38 @@
+#!/bin/sh
+# BrazilFW pppd for pppoe (DSL) Startup Script
+. /etc/coyote/coyote.conf
+
+cp -p /etc/ppp/options.pppoe.template /etc/ppp/options.pppoe
+echo -n > /etc/ppp/options
+
+echo "pty 'pppoe -I $IF_INET -m 1452'"           >>/etc/ppp/options.pppoe
+echo "user '$PPPOE_USERNAME'"                    >>/etc/ppp/options.pppoe
+if [ "$PPPOE_IDLE" != "NO" ]; then
+	echo "idle $PPPOE_IDLE"                  >>/etc/ppp/options.pppoe
+	echo "demand"                            >>/etc/ppp/options.pppoe
+fi
+
+echo "# Do not modify this file directly;"       > /etc/ppp/pap-secrets
+echo "# make changes in /etc/coyote/coyote.conf" >>/etc/ppp/pap-secrets
+echo "# or they will be lost upon reboot!"       >>/etc/ppp/pap-secrets
+echo "'$PPPOE_USERNAME' * '$PPPOE_PASSWORD' *"   >>/etc/ppp/pap-secrets
+
+ln -sf /etc/ppp/pap-secrets /etc/ppp/chap-secrets
+chmod 600 /etc/ppp/*-secrets
+
+echo "Starting pppd"
+ifconfig $IF_INET up mtu 1500 
+if [ $? = 0 ] ; then
+	pppd file /etc/ppp/options.pppoe &
+	if [ $? = 0 ] ; then
+		INET_UP=READY
+	else
+		INET_UP=DOWN
+		echo "PPP Daemon not started properly"
+		logger "PPP Daemon not started properly"
+	fi
+else
+	INET_UP=DOWN
+	echo "The Internet Network Interface Card was not set properly"
+	logger "The Internet Network Interface Card was not set properly"
+fi  

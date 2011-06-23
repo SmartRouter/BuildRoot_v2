@@ -1,0 +1,176 @@
+#!/bin/sh
+#
+# Build resolv.conf, resolv.dns and hosts
+# Loads the dnsmasq as needed
+# Author: Claudio Roberto Cussuol
+#
+
+TMP_DIR=/tmp
+
+. /etc/coyote/coyote.conf
+
+[ -e /tmp/netsubsys.state ] && \
+ { . /tmp/netsubsys.state; LOCAL_IPADDR=`getifaddr $IF_LOCAL`; }
+
+RESOLVFILE="/etc/resolv.conf"
+
+if [ "$INETTYPE" = "ETHERNET_DHCP" ]; then
+ [ -e "/etc/dhcpc/$IF_INET.info" ] && . /etc/dhcpc/$IF_INET.info
+fi
+
+[ -z "$DOMAINNAME" -a -n "$dhcp_domain" ] && DOMAINNAME="$dhcp_domain"
+[ -z "$DOMAINNAME" -a -n "$DHCPD_DOMAIN" ] && DOMAINNAME="$DHCPD_DOMAIN"
+[ -z "$DOMAINNAME" ] && DOMAINNAME="localdomain"
+HOSTNAME=`hostname`
+
+#==================================
+treat_line2() {
+while [ -n "$1" ]; do 
+ if [ "`echo $1 | cut -f 1 -d :`" != "$1" ]; then
+	MAC="$1"
+ elif [ "`echo $1 | cut -f 1 -d .`" != "$1" ]; then
+	IP="$1"
+ elif [ -z "$IP" -a -z "$HOST" ]; then
+	HOST="$1"
+ else
+	TIME="$1"
+ fi  
+ shift
+done
+}
+
+#==================================
+treat_line() {
+TLINE=`echo "$1" | cut -f 2 -d = | sed s/\,/\ /g`
+IP=""
+HOST=""
+MAC=""
+TIME=""
+treat_line2 $TLINE
+[ -n "$IP" -a -n "$HOST" ] && echo $IP $HOST >> /etc/hosts
+}
+
+RUNNING="NO"
+if [ -e /var/run/dnsmasq.pid ]; then
+ if [ -z "`ps | grep dnsmasq`" ]; then
+	RUNNING="NO"
+ else
+	RUNNING="YES"
+ fi    
+fi
+if [ "$RUNNING" = "YES" ] ; then
+ echo "Stopping DNS and DHCP server"
+ kill -9 `cat /var/run/dnsmasq.pid` 2> /dev/null
+ rm -rf /var/run/dnsmasq.pid 2> /dev/null
+ [ -e /etc/resolv.dns ] && \
+	{ cp /etc/resolv.dns /etc/resolv.conf; rm -rf /etc/resolv.dns > /dev/null; }
+fi
+
+echo "Generating hosts Configuration file..."
+echo -e "127.0.0.1\t\tlocalhost" > /etc/hosts
+if [ -n "$LOCAL_IPADDR" ] ; then
+ echo -e -n "$LOCAL_IPADDR\t" >> /etc/hosts
+ echo "$HOSTNAME" >> /etc/hosts
+fi	
+
+if [ -e /etc/hosts.dns ]; then
+ cat /etc/hosts.dns | while read TMPLINE ; do
+	case "$TMPLINE" in
+	 \#*|"") continue;;
+	 *) echo "$TMPLINE" >> /etc/hosts;;
+	esac
+ done
+fi
+
+if [ -e /etc/dhcpd.reservations ] ; then
+ cat /etc/dhcpd.reservations | while read TMPLINE ; do
+	case "$TMPLINE" in
+	 \#*|"") continue;;
+	 dhcp-host=*) treat_line "$TMPLINE";;
+	esac
+ done
+fi
+
+echo "Generating resolv.conf Configuration file..."
+rm -rf /etc/resolv.dns
+echo "domain $DOMAINNAME" > /etc/resolv.conf
+[ -e /tmp/realdns1 ] && echo "nameserver `cat /tmp/realdns1`" >> /etc/resolv.conf
+[ -e /tmp/realdns2 ] && echo "nameserver `cat /tmp/realdns2`" >> /etc/resolv.conf
+[ -e /tmp/realdns3 ] && echo "nameserver `cat /tmp/realdns3`" >> /etc/resolv.conf
+chmod go+r /etc/resolv.conf
+if [ "$USE_DNS_CACHE" = "YES" ] ; then
+ RESOLVFILE="/etc/resolv.dns"
+ cp /etc/resolv.conf $RESOLVFILE
+ echo "domain $DOMAINNAME" > /etc/resolv.conf
+ echo "nameserver 127.0.0.1" >> /etc/resolv.conf
+ chmod go+r /etc/resolv.conf
+fi
+
+if [ "$DHCPSERVER" = "YES" -o "$USE_DNS_CACHE" = "YES" ] ; then
+ echo "Generating DHCP Configuration file..."
+ if [ -z "$DHCPD_DOMAIN" ]; then
+	DHCPD_DOMAIN=`cat $RESOLVFILE | grep "domain " | cut -f 2 -d " "`
+	if [ -z "$DHCPD_DOMAIN" ]; then
+    	 DHCPD_DOMAIN=`cat $RESOLVFILE | grep "search " | cut -f 2 -d " "`
+	fi
+	if [ -z "$DHCPD_DOMAIN" ]; then
+    	 [ -z "$DOMAINNAME" ] && DHCPD_DOMAIN=localdomain || DHCPD_DOMAIN="$DOMAINNAME"
+	fi
+ fi
+
+ echo "user=root" > /etc/dnsmasq.conf
+ echo "group=root" >> /etc/dnsmasq.conf
+ echo "domain-needed" >> /etc/dnsmasq.conf
+ echo "expand-hosts" >> /etc/dnsmasq.conf
+ echo "filterwin2k" >> /etc/dnsmasq.conf
+# echo "interface=$IF_LOCAL" >> /etc/dnsmasq.conf
+ if ! [ -z "$DHCPD_DOMAIN" ]; then
+#   echo "local=/${DHCPD_DOMAIN}/" >> /etc/dnsmasq.conf
+echo "domain=${DHCPD_DOMAIN}" >> /etc/dnsmasq.conf
+ fi
+
+ [ "$USE_DNS_CACHE" = "YES" ] && echo "resolv-file=/etc/resolv.dns" >> /etc/dnsmasq.conf
+ if [ "$DHCPSERVER" = "YES" ] ; then
+	[ -z "$DHCPD_LEASE" ] && DHCPD_LEASE=7200
+	echo "dhcp-leasefile=/var/state/dhcp/dhcpd.leases" >> /etc/dnsmasq.conf
+	echo "dhcp-range=${DHCPD_START_IP},${DHCPD_END_IP},${DHCPD_LEASE}" >> /etc/dnsmasq.conf
+
+	if [ ! -z "$DHCPD_DNS1" ]; then
+	 echo -n "dhcp-option=6,$DHCPD_DNS1" >> /etc/dnsmasq.conf
+	 [ -z "$DHCPD_DNS2" ] || echo -n ",$DHCPD_DNS2" >> /etc/dnsmasq.conf 
+	 [ -z "$DHCPD_DNS3" ] || echo -n ",$DHCPD_DNS3" >> /etc/dnsmasq.conf
+	 echo "" >> /etc/dnsmasq.conf
+	else	
+        if [ ! "$USE_DNS_CACHE" = "YES" ]; then
+		echo -n "dhcp-option=6" >> /etc/dnsmasq.conf
+		cat $RESOLVFILE | grep "nameserver " | while read NAMETMP; do
+		 DNSSRV=`echo $NAMETMP | cut -f 2 -d " "`
+		if ! [ -z "$DNSSRV" ]; then
+	    	 echo -n ",$DNSSRV" >> /etc/dnsmasq.conf
+		else
+		 echo -n ",$LOCAL_IPADDR" >> /etc/dnsmasq.conf
+		fi
+	 done
+	 echo "" >> /etc/dnsmasq.conf	   
+	fi
+ fi
+ [ -z "$DHCPD_WINS1" ] || echo "dhcp-option=44,$DHCPD_WINS1" >> /etc/dnsmasq.conf
+ [ -z "$DHCPD_WINS2" ] || echo "dhcp-option=44,$DHCPD_WINS2" >> /etc/dnsmasq.conf
+ [ ! -z "$DHCPD_SUBNET" ] && echo "dhcp-option=1,$DHCPD_SUBNET" >> /etc/dnsmasq.conf
+ [ ! -z "$DHCPD_ROUTER" ] && echo "dhcp-option=3,$DHCPD_ROUTER" >> /etc/dnsmasq.conf
+ if [ -e /etc/dhcpd.reservations ] ; then
+	cat /etc/dhcpd.reservations | while read TMPLINE ; do
+		case "$TMPLINE" in
+		 \#*|"") continue;;
+		 dhcp-host=*) echo "$TMPLINE" >> /etc/dnsmasq.conf;;
+		esac
+	 done
+	fi
+ fi 
+ [ -e "/etc/dnsmasq.conf.template" ] && cat /etc/dnsmasq.conf.template >> /etc/dnsmasq.conf
+fi
+
+if [ "$USE_DNS_CACHE" = "YES" -o "$DHCPSERVER" = "YES" ] ; then
+ echo "Starting DNS and DHCP server"
+ /usr/sbin/dnsmasq
+fi

@@ -1,0 +1,112 @@
+#!/bin/sh
+# Subnetting QOS Script
+# Changed to support subnet QOS in others LAN interfaces
+# by BFW user "agsoliveira" - Revision by BFW user "marcos do vale" - 10/09/2007
+# OBS: The root class is 1000
+#      The junk class is 9999
+#      The subnet classes are 1000 + Subnet ID
+
+. /etc/coyote/coyote.conf
+
+iptables="/usr/sbin/iptables"
+tc="/usr/sbin/tc"
+
+[ "$INETTYPE" = "PPPOE" -o "$INETTYPE" = "PPP" ] && IF_INET=ppp0
+
+echo " Iface $IF_INET"
+echo "  Creating Upload Root Class: Rate ${QOS_UPSTREAM}kbit"
+# Create root class # Upload
+$tc qdisc  add dev $IF_INET root          handle  1:     htb default 9999
+$tc class  add dev $IF_INET parent 1:     classid 1:1000 htb rate ${QOS_UPSTREAM}kbit
+
+echo "   Creating Upload Junk Class: Rate ${UPSTREAM_JUNK}kbit"
+$tc class  add dev $IF_INET parent 1:1000 classid 1:9999 htb rate ${UPSTREAM_JUNK}kbit prio 4
+$tc qdisc  add dev $IF_INET parent 1:9999 handle  9999:  sfq perturb 5
+$tc filter add dev $IF_INET parent 1:0    protocol ip prio 4 handle 9999 fw classid 1:9999
+
+#echo "  Creating Download Ingress Class: Rate ${QOS_DOWNSTREAM}kbit"
+#$tc qdisc  del dev $IF_INET ingress 2> /dev/null
+#$tc qdisc  add dev $IF_INET handle ffff: ingress
+#$tc filter add dev $IF_INET parent ffff: protocol ip prio 4 u32 match ip src 0.0.0.0/0 \
+# police rate ${QOS_DOWNSTREAM}kbit burst 8k drop flowid :1
+
+#==========================================
+lan_setup() {
+ echo " Iface $1"
+ echo "  Creating Download Root Class: Rate ${QOS_DOWNSTREAM}kbit"
+ $tc qdisc  add dev $1 root          handle 1:      htb default 9999
+ $tc class  add dev $1 parent 1:     classid 1:1000 htb rate ${QOS_DOWNSTREAM}kbit
+
+ echo "   Creating Download Junk Class: Rate ${DOWNSTREAM_JUNK}kbit"
+ $tc class  add dev $1 parent 1:1000 classid 1:9999 htb rate ${DOWNSTREAM_JUNK}kbit prio 4
+ $tc qdisc  add dev $1 parent 1:9999 handle  9999:  sfq perturb 5
+ $tc filter add dev $1 parent 1:0    protocol ip prio 4 handle 9999 fw classid 1:9999
+
+# echo "  Creating Upload Ingress Class"
+# $tc qdisc  add dev $1 handle ffff: ingress
+}
+
+lan_setup $IF_LOCAL
+[ -n "$IF_LOCAL2" ] && lan_setup $IF_LOCAL2
+[ -n "$IF_LOCAL3" ] && lan_setup $IF_LOCAL3
+[ -n "$IF_LOCAL4" ] && lan_setup $IF_LOCAL4
+[ -n "$IF_WLAN" ] && lan_setup $IF_WLAN
+[ -n "$IF_DMZ" ] && lan_setup $IF_DMZ
+
+#==========================================
+find_lan() {
+ case "$1" in
+	LAN1)	LAN=$IF_LOCAL;;
+	LAN2)	LAN=$IF_LOCAL2;;
+	LAN3)	LAN=$IF_LOCAL3;;
+	LAN4)	LAN=$IF_LOCAL4;;
+	WLAN)	LAN=$IF_WLAN ;;
+	DMZ)	LAN=$IF_DMZ ;;
+	*)	LAN=$IF_LOCAL;;
+ esac
+}
+
+# Function to create the subnet classes
+subnet() {
+ ACTIVE=`echo $1 | tr [A-Z] [a-z]`
+ QOS=`echo $6 | tr [A-Z] [a-z]`
+ if [ "$ACTIVE" = "y" -a "$QOS" = "y" ]; then
+	ID=$2
+	IP=$3
+	MASK=$4
+	DOWN_RATE=$7
+	DOWN_CEIL=$8
+	UP_RATE=$9
+	UP_CEIL=$10
+	find_lan $11
+	[ -z $12 ] && LAN_ID=$ID || LAN_ID=$12
+	[ -z $13 ] && CONLIMIT=0 || CONLIMIT=$13
+	CID=$((1000+$ID))
+
+	echo "  SUBNET $LAN:$LAN_ID - IP $IP/$MASK"
+
+	echo "   Creating Download Class: Rate ${DOWN_RATE}kbit Ceil ${DOWN_CEIL}kbit"
+	$tc class  add dev $LAN parent 1:1000 classid 1:$CID htb rate ${DOWN_RATE}kbit ceil ${DOWN_CEIL}kbit prio 3
+	$tc qdisc  add dev $LAN parent 1:$CID handle  $CID: sfq  perturb 5
+	$tc filter add dev $LAN parent 1:0    protocol ip prio 4 handle  $CID fw classid 1:$CID
+	$iptables -t mangle -A Subnet_qos -s $IP/$MASK -j MARK --set-mark $CID
+
+#	echo "   Creating Upload Ingress Filter: Rate ${UP_CEIL}kbit"
+#	$tc filter add dev $LAN parent ffff: protocol ip prio 5 u32 match ip src $IP/$MASK \
+#	police rate ${UP_CEIL}kbit burst 10k drop flowid :$CID
+
+	echo "   Creating Upload Class: Rate ${UP_RATE}kbit Ceil ${UP_CEIL}kbit"
+	$tc class  add dev $IF_INET  parent 1:1000 classid 1:$CID htb rate ${UP_RATE}kbit ceil ${UP_CEIL}kbit prio 3
+	$tc qdisc  add dev $IF_INET  parent 1:$CID handle  $CID: sfq  perturb 5
+	$tc filter add dev $IF_INET  parent 1:0    protocol ip prio 4 handle  $CID fw  classid 1:$CID
+	$iptables -t mangle -A Subnet_qos -d $IP/$MASK -j MARK --set-mark $CID
+
+	[ "$CONLIMIT" != 0 ] && { echo "     - Building connection limit: $CONLIMIT";
+	$iptables -t mangle -A Subnet_qos -p tcp -s $IP/$MASK -m state ! --state RELATED \
+	-m connlimit --connlimit-above $CONLIMIT --connlimit-mask 32 -j DROP; }
+
+ fi
+}
+
+. /etc/coyote/subnet.cfg # Process the configuration file
+

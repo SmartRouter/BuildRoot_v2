@@ -1,0 +1,40 @@
+#!/bin/sh
+#
+# Coyote DHCP Startup Script
+#
+# Author: Claudio Roberto Cussuol
+#         08/03/2004
+#
+
+ 
+if ! [ -z "$DHCPHOSTNAME" ]; then
+	DHCPCDOPTIONS="-i $IF_INET -H $DHCPHOSTNAME"
+else 
+	DHCPCDOPTIONS="-i $IF_INET"
+fi
+DHCPCDOPTIONS="$DHCPCDOPTIONS -s /etc/dhcpc/dhcpc.updown -p /var/run/udhcpc.pid"
+
+# Attempt to configure the Internet interface with DHCP if so configured
+# DHCP Assigned Internet Address
+echo "Setting up DHCP Internet connection..."
+
+# Clear any stale PID files and old interface.info
+rm /var/run/udhcpc.pid 1> /dev/null 2> /dev/null
+rm /etc/dhcpc/$IF_INET.info 1> /dev/null 2> /dev/null
+
+# Configure the interface
+ip link set $IF_INET up   #Just to check if nic is ok.
+if [ ! $? = 0 ]; then
+   INET_UP=DOWN
+   echo "The Internet Network Interface Card was not set properly"
+   logger "The Internet Network Interface Card was not set properly"
+else
+   udhcpc $DHCPCDOPTIONS &
+   if [ ! $? = 0 ]; then
+  	INET_UP=DOWN
+        echo "The DHCP client daemon not started properly"
+        logger "The DHCP client daemon not started properly"
+   else
+	INET_UP=READY
+   fi
+fi   

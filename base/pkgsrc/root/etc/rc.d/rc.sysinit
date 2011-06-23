@@ -1,0 +1,309 @@
+#!/bin/sh
+#
+# rc.sysinit - unpacks additional archives and starts system
+# scripts
+#
+/bin/mount -t proc /proc /proc
+
+# Have busybox create the symbolic links
+/bin/busybox --install -s
+
+mkdir /dev/inet
+mkdir /tmp
+mkdir /mnt
+mkdir /var/lock
+mkdir /var/run
+
+MNT="/var/lib/lrpkg/mnt"
+mkdir $MNT
+
+ln -s /tmp /var/tmp
+ln -s /tmp /usr/tmp
+
+. /var/lib/lrpkg/root.dev.mk
+
+#Incase makedev fails, maybe we can recover
+[ ! -e /dev/tty1 ] && mknod /dev/tty1 c 4 1
+
+#Set some permissions
+chmod 1777 /var/lock
+chmod 1777 /tmp
+
+CMDLINE=`echo -e $(cat /proc/cmdline | awk '{print tolower($0)}' | sed 's/\ */\\\012/g')`
+BOOT=`echo "$CMDLINE" | grep -i "^boot=" | sed s/boot=//g`
+BOOTDELAY=`echo "$CMDLINE" | grep -i "^bootdelay=" | sed s/bootdelay=//g`;[ -z "$BOOTDELAY" ] && BOOTDELAY=15
+
+install_config() {
+	if [ ! -r "$MNT/config/$1" ]; then
+		return
+	fi
+	cat $MNT/config/$1 | dos2unix -u > /etc/coyote/$2
+	chmod 755 /etc/coyote/$2
+	chown root.root /etc/coyote/$2
+}
+
+search_boot() {
+################################################################
+# Automatic detect boot device by Washington Rodrigues 2008    #
+# Detect boot device in order: CDROM,USB,SCSI/SATA and IDE ATA #
+# Finally write the information into /tmp/boot.info            #
+################################################################
+MANUAL_BOOT=0
+if [ -n "$BOOT" ]; then
+   DEVICE=`basename "$BOOT"`
+   case $DEVICE in
+        hd??)
+            DEVTMP=`echo $DEVICE | sed s/[0123456789]//g`
+            if [ "$(cat /proc/ide/$DEVTMP/media)" = "disk" ]; then
+                  TYPE="PATA"
+                  mount -o ro /dev/$DEVICE $MNT 2>/dev/null
+                  if [ "$?" = 0 ]; then
+                     if [ -e "$MNT/brazilfw.dpy" ]; then
+                        FSTYPE=vfat
+                        MANUAL_BOOT=1
+                        echo "5#$TYPE#/dev/$DEVICE#$FSTYPE#no#no"
+                     fi
+                     umount $MNT 2>/dev/null
+                  fi       
+            fi;;
+        sd??)    
+            INFO=`scsi_info /dev/$DEVICE 2>/dev/null`
+            HOST=`echo $INFO | sed 's/.*HOST=\"//g;s/\".*//g'`
+            MODEL=`echo $INFO | sed 's/.*MODEL=\"//g;s/\".*//g'`
+            ls /proc/scsi/usb*/$HOST 2>/dev/null 1>/dev/null
+            if [ "$?" = 0 ]; then
+               if [ "$(echo $MODEL | grep -c -i "Flash Disk")" = 1 ]; then
+                  TYPE="PENDRIVE"
+               else
+                  TYPE="HDD USB"
+               fi   
+            elif [ "$(echo $MODEL | cut -f1 -d" ")" = "ATA" ]; then
+               TYPE="SATA"
+            else
+               TYPE="SCSI"
+            fi
+            if [ "$(echo $DEVICE | sed s/[^0123456789]//g)" = 1 ]; then
+               mount -o ro /dev/$DEVICE $MNT 2>/dev/null
+               if [ "$?" = 0 ]; then
+                  if [ -e "$MNT/brazilfw.dpy" ]; then
+                     FSTYPE=vfat
+                     case $TYPE in
+                          PENDRIVE) POSITION=1;BCKDELAY="yes";;
+                              HDD*) POSITION=2;BCKDELAY="yes";;
+                              SATA) POSITION=3;BCKDELAY="no";;
+                              SCSI) POSITION=4;BCKDELAY="no";;
+                     esac
+                     MANUAL_BOOT=1
+                     echo "$POSITION#$TYPE#/dev/$DEVICE#$FSTYPE#no#$BCKDELAY"
+                  fi
+                  umount $MNT 2>/dev/null
+               fi
+            fi;; 
+   esac
+fi
+if [ "$MANUAL_BOOT" = 0 ]; then
+   for CDROM in $(ls /proc/ide/hd?);do
+       if [ "$(cat $CDROM/media)" = "cdrom" ]; then
+          DEVICE=`basename $CDROM`
+          mount -o ro /dev/$DEVICE $MNT -t iso9660 2>/dev/null
+          if [ "$?" = 0 ]; then
+             if [ -e "$MNT/brazilfw.dpy" ]; then
+                echo "0#CDROM#/dev/$DEVICE#iso9660#yes#no"
+             fi
+             umount $MNT 2>/dev/null
+          fi
+       fi
+   done
+   cat /proc/partitions | while read x x LENGHT DEVICE; do
+       case $DEVICE in
+            hd??) 
+               if [ "$(echo $DEVICE | sed s/[^0123456789]//g)" = 1 ]; then
+                  DEVTMP=`echo $DEVICE | sed s/[0123456789]//g`
+                  if [ "$(cat /proc/ide/$DEVTMP/media)" = "disk" ]; then
+                     TYPE="PATA"
+                     mount -o ro /dev/$DEVICE $MNT 2>/dev/null
+                     if [ "$?" = 0 ]; then
+                        if [ -e "$MNT/brazilfw.dpy" ]; then
+                           FSTYPE=vfat
+                           echo "5#$TYPE#/dev/$DEVICE#$FSTYPE#no#no"
+                        fi
+                        umount $MNT 2>/dev/null
+                     fi       
+                  fi
+               fi;;   
+            sd??)
+               INFO=`scsi_info /dev/$DEVICE 2>/dev/null`
+               HOST=`echo $INFO | sed 's/.*HOST=\"//g;s/\".*//g'`
+               MODEL=`echo $INFO | sed 's/.*MODEL=\"//g;s/\".*//g'`
+               ls /proc/scsi/usb*/$HOST 2>/dev/null 1>/dev/null
+               if [ "$?" = 0 ]; then
+                  if [ "$(echo $MODEL | grep -c -i "Flash Disk")" = 1 ]; then
+                     TYPE="PENDRIVE"
+                  else
+                     TYPE="HDD USB"
+                  fi   
+               elif [ "$(echo $MODEL | cut -f1 -d" ")" = "ATA" ]; then
+                  TYPE="SATA"
+               else
+                  TYPE="SCSI"
+               fi
+               if [ "$(echo $DEVICE | sed s/[^0123456789]//g)" = 1 ]; then
+                  mount -o ro /dev/$DEVICE $MNT 2>/dev/null
+                  if [ "$?" = 0 ]; then
+                     if [ -e "$MNT/brazilfw.dpy" ]; then
+                        FSTYPE=vfat
+                        case $TYPE in
+                             PENDRIVE) POSITION=1;BCKDELAY="yes";;
+                                 HDD*) POSITION=2;BCKDELAY="yes";;
+                                 SATA) POSITION=3;BCKDELAY="no";;
+                                 SCSI) POSITION=4;BCKDELAY="no";;
+                        esac
+                        echo "$POSITION#$TYPE#/dev/$DEVICE#$FSTYPE#no#$BCKDELAY"
+                     fi
+                     umount $MNT 2>/dev/null
+                  fi
+               fi;;
+       esac
+   done
+fi
+}
+
+echo "Detecting boot device. Waiting for $BOOTDELAY seconds..."
+sleep "$BOOTDELAY"
+BOOT=$(search_boot | sort | head -n1)
+if [ -n "$BOOT" ]; then
+   DEVICE=`echo $BOOT | cut -f3 -d"#"`
+   TYPE=`echo $BOOT | cut -f2 -d"#"`
+   FSTYPE=`echo $BOOT | cut -f4 -d"#"`
+   READONLY=`echo $BOOT | cut -f5 -d"#"`
+   DELAYBACKUP=`echo $BOOT | cut -f6 -d"#"`
+   echo -e "DEVICE=\"$DEVICE\"\012MEDIA=\"$TYPE\"\012FSTYPE=\"$FSTYPE\"\012READONLY=\"$READONLY\"\012DELAYBACKUP=\"$DELAYBACKUP\"" > /tmp/boot.info
+else
+   echo 
+   echo "##############################"
+   echo "# Unsupported boot hardware! #"
+   echo "##############################"
+   echo
+   sh
+   exit 1
+fi
+
+#Coyote only supports MS-DOS formatted floppies
+
+echo "Using: $DEVICE as boot device with $FSTYPE filesystem."
+
+echo $FSTYPE > /var/lib/lrpkg/boot.fstype
+ln -sf $DEVICE /dev/boot
+
+mounted="false"
+
+for try in 2 5 10 15 ; do
+  mount -o ro -t $FSTYPE $DEVICE $MNT
+  if [ $? -eq 0 ]; then
+    mounted="true"
+    break
+  else
+    echo "Waiting $try seconds to try again"
+    sleep $try
+  fi
+done
+
+if [ "$mounted" = "false" ]; then
+  echo "LINUXRC: Could not mount the boot device. Can't install packages."
+  sh
+  exit 1
+fi
+
+# Install the additional software packages
+echo "root" >/var/lib/lrpkg/packages
+
+if [ -f /var/lib/lrpkg/root.packages ]; then
+	cat /var/lib/lrpkg/root.packages > /tmp/pkg.list
+fi
+
+cat /tmp/pkg.list | while read F; do
+	echo $F.tgz >> /tmp/pkg.list2
+done
+
+# Build a list of all non-root packages
+for F in `ls $MNT/*.tgz`; do
+	F=`basename $F .tgz`
+	if [ -z "`grep $F.tgz /tmp/pkg.list2`" ] && [ "$F" != "root" ]; then
+		echo $F >> /tmp/pkg.list
+	fi
+done
+
+if [ -f /tmp/pkg.list ]; then
+	echo -n "Installing packages: "
+
+	OIFS=$IFS; IFS=','
+	cat /tmp/pkg.list | while read f; do
+
+		if [ ! -z "$f" ]; then
+			if [ -f $MNT/$f.tgz ]; then
+
+				gunzip -t $MNT/$f.tgz > /dev/null
+				if [ $? -eq 0 ]; then
+					echo -n " $f"
+					tar -xzf $MNT/$f.tgz
+					echo "$f">>/var/lib/lrpkg/packages	#Update installed packages file
+				else
+					echo -n " $f(cpt!)"
+				fi
+			else
+				echo -n " $f(nf!)"
+			fi
+		fi
+	done
+	IFS=$OIFS
+	echo " - Finished."
+	rm -f /tmp/pkg.list
+	rm -f /tmp/pkg.list2
+else
+	echo "Package list is empty. Can't install packages."
+fi
+
+cat /var/lib/lrpkg/*.config_files | while read f; do
+	f1=`echo $f | cut -f 1 -d " "`
+	f2=`echo $f | cut -f 2 -d " "`
+	install_config $f1 $f2
+done
+
+
+ls $MNT/config/profiles/*.prf > /dev/null 2> /dev/null
+if [ $? = 0 ] ; then
+  [ ! -e /etc/coyote/profiles ] && mkdir /etc/coyote/profiles > /dev/null 2> /dev/null
+  cp $MNT/config/profiles/*.prf /etc/coyote/profiles
+fi
+
+. /var/lib/lrpkg/root.dev.own
+. /var/lib/lrpkg/root.dev.mod
+
+umount $MNT
+
+# New Mount Partition by Washington Rodrigues 2008 #
+
+. /etc/coyote/coyote.conf
+if [ "$MEDIA" != "CDROM" ]; then
+
+   if [ -z "$PARTITION" ]; then
+      IDHD=`echo $(($(echo $DEVICE | sed s/[^0123456789]//g)+1))`
+      PART2=`echo $DEVICE | sed s/[0123456789]//g`"$IDHD"
+   else
+      PART2=`echo "$PARTITION"`
+   fi
+   mount -o ro $PART2 $MNT 2>/dev/null
+   if [ "$?" = 0 ]; then
+      FSF=`mount | grep -i "$MNT" | cut -f5 -d" "`
+      echo -e "DEVICE=$PART2\012FSTYPE=$FSF" > /tmp/partition.info
+      umount $MNT
+   fi
+   if [ -e "/tmp/partition.info" ]; then
+      /bin/e2fsck -p $PART2
+      [ "$?" != 0 ] && /bin/e2fsck -f -y $PART2
+      mkdir /partition
+      mount -o noatime,nodiratime $PART2 /partition 2>/dev/null
+   fi
+fi
+
+/etc/rc.d/rc.S

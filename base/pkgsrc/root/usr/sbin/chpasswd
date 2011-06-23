@@ -1,0 +1,41 @@
+#!/bin/sh
+#################################################
+#Password utility - by Washington Rodrigues 2008#
+#################################################
+
+DIALOG=${DIALOG=dialog}
+TITLE_WINDOW="BrazilFW Firewall and Router -- System Password"
+passwd1=$(
+$DIALOG --stdout \
+        --backtitle "$TITLE_WINDOW" \
+        --nocancel --insecure \
+        --passwordbox "Enter the new password:" \
+               0 0)
+[ -z "$passwd1" -o $? != 0 ] && { clear;exit; } 
+passwd2=$(
+$DIALOG --stdout \
+        --backtitle "$TITLE_WINDOW" \
+        --nocancel --insecure \
+        --passwordbox "Confirm password:" \
+               0 0)
+[ -z "$passwd2" -o $? != 0 ] && { clear;exit; }
+if [ "$passwd1" != "$passwd2" ]; then
+   $DIALOG --backtitle "$TITLE_WINDOW" \
+           --msgbox "Password does not confer!" 6 35
+           clear
+           exit
+else
+  cryptpassword=`echo $(/usr/bin/cryptpw "$passwd1")`
+  sed -i s\~^root:.*$~root:"${cryptpassword}":10091:0:99999:7:::~g /etc/shadow
+  ADMIN_AUTH=`echo ${cryptpassword} | cut -b 5-`
+  if [ "$(cat /etc/coyote/coyote.conf | grep -c -i "ADMIN_AUTH")" = 1 ]; then
+     sed -i s\~^ADMIN_AUTH.*$~"ADMIN_AUTH='$ADMIN_AUTH'"~g /etc/coyote/coyote.conf
+  else
+     echo "ADMIN_AUTH='$ADMIN_AUTH'" >> /etc/coyote/coyote.conf
+  fi
+  echo "root:${cryptpassword}" > /var/http/htdocs/cgi-bin/.htpasswd
+  $DIALOG --backtitle "$TITLE_WINDOW" \
+           --msgbox "Password defined successfully!" 6 35
+           clear
+           exit
+fi

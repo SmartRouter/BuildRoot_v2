@@ -1,0 +1,20 @@
+#!/bin/sh
+#
+# rc.webadmin - Starts the Coyote Linux web administration frontend
+
+# Make sure that the web admin password and the system root password are
+# in sync
+
+. /etc/coyote/coyote.conf
+
+ROOTPASS=`grep root: /etc/shadow | cut -f 2 -d :`
+if ! [ -z "$ROOTPASS" ]; then
+    echo "root:$ROOTPASS" > /var/http/htdocs/cgi-bin/.htpasswd
+fi
+
+if [ "$ENABLE_WEBADMIN" != "NO" ] ; then
+  if [ -z "$WEBADMIN_PORT" ] ; then WEBADMIN_PORT=8180 ; fi
+  echo "Starting Web Administration Server..."
+
+  /usr/sbin/thttpd -u root -d /var/http/htdocs -nor -h $LOCAL_IPADDR -p $WEBADMIN_PORT -c "/cgi-bin/*"
+fi 

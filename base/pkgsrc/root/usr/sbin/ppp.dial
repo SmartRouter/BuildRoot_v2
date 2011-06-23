@@ -1,0 +1,38 @@
+#!/bin/sh
+#
+# PPP link dial script
+# 
+# Claudio Roberto Cussuol
+# 19/06/2004
+#
+# Source the coyote linux configuration file
+. /etc/coyote/coyote.conf
+
+[ -z "$PPP_ISP" ] && PPP_ISP=isp
+
+if [ "$INETTYPE" = "PPP" ] ; then
+	if [ "$PPP_DEMANDDIAL" = "NO" ] ; then
+		if [ -f /var/run/ppp0.pid ]; then
+			echo "PPP is running already"
+			exit 1
+		else
+			echo "Calling $PPP_ISP"
+			/usr/sbin/pppd call $PPP_ISP
+		fi
+	else
+		if ! [ -f /var/run/ppp0.pid ]; then
+			echo "Calling $PPP_ISP"
+			/usr/sbin/pppd call $PPP_ISP
+		fi
+		echo "Using demand dial."
+		ping -c 1 198.41.0.4 </dev/null >/dev/null 2> /dev/null &
+	fi
+else
+#	if [ -f /var/run/ppp0.pid ]; then
+#		echo "PPPoE is running already"
+#		exit 1
+#	else
+	 	echo "Starting PPPoE"
+		/usr/sbin/pppd file /etc/ppp/options.pppoe &
+#	fi	
+fi

@@ -1,0 +1,89 @@
+# Function Include File for Coyote Linux Web Administrator
+. /etc/coyote/coyote.conf
+
+. /var/language/webadmin.enu # Load the default language file (English)
+# Include an aditional language files if there is one
+if [ -n "$LANGUAGE_WEBADMIN" ] ; then
+  CODLANG=`echo $LANGUAGE_WEBADMIN | tr [A-Z] [a-z]`
+  [ -r /var/language/webadmin.${CODLANG} ] && . /var/language/webadmin.${CODLANG}
+fi  
+# Perform shell variable expansion for any form data
+eval "`/usr/bin/proccgi`"
+cr2br () {
+ ${@} | while read LINES; do
+	echo "${LINES} <br>"
+ done
+}	
+cl_header () {
+ echo -n "Content-type: text/html
+
+ <html><head><title>${1}</title><body>"
+}
+cl_footer () {
+ echo "<br><center>[<a href=/>$MM</a>]</center></body></html>"
+}
+cl_menuitem () {
+ echo "<tr><td class=itemmenu><a href=${2}>${1}</a></td></tr>"
+}
+cl_header2 () {
+ echo -n "Content-type: text/html
+ Pragma: nocache
+ cache-control: no-cache, must-revalidate, no-store
+
+ <html><head><title>${1}</title>"
+ [ ! -e /var/http/htdocs/style/style.css ] && \
+ cat /var/http/style.css || cat /var/http/htdocs/style/style.css
+ echo "</head>"
+ . /var/http/header.inc
+	cl_menuitem "$Mh" "/cgi-bin/index.cgi"
+	cl_menuitem "$Mln" "/cgi-bin/lanconf.cgi"
+	cl_menuitem "$Mic" "/cgi-bin/inetconf.cgi"
+	cl_menuitem "$Pti" "/cgi-bin/loadbalance.cgi"
+	cl_menuitem "$Mdz" "/cgi-bin/dmzconf.cgi"
+	cl_menuitem "$Mdh" "/cgi-bin/dhcpconf.cgi"
+	cl_menuitem "$Mac" "/cgi-bin/adminconf.cgi"
+	cl_menuitem "$Mpf" "/cgi-bin/portfw.cgi"
+	cl_menuitem "$Msf" "/cgi-bin/sfirewall.cgi"
+	cl_menuitem "$Mfc" "/cgi-bin/firewall.cgi"
+	cl_menuitem "$Mqc" "/cgi-bin/qos.cgi"
+	cl_menuitem "$Msg" "/cgi-bin/cron.cgi"
+	cl_menuitem "$Psf" "/cgi-bin/subnet.cgi"
+	cl_menuitem "$Msp" "/cgi-bin/chpasswd.cgi"
+#Allow future packages to add new pages to webadmin menu
+	FILES=`ls /var/http/htdocs/cgi-bin/pak_*.inc 2>/dev/null`
+	if [ ! -z "$FILES" ]; then
+	 for INCS in $FILES ; do
+		[ -x $INCS ] && . $INCS
+	 done
+	fi
+	cl_menuitem "$Mcf" "/cgi-bin/editconf.cgi"
+	cl_menuitem "$Mdt" "/cgi-bin/diags.cgi"
+	cl_menuitem "$Msh" "/cgi-bin/profiles.cgi"
+	cl_menuitem "$Mbt" "/cgi-bin/backup.cgi"
+	cl_menuitem "$Mpc" "/cgi-bin/reboot.cgi"
+# End main menu -----------
+echo -n "</table></td><td width=100% class=middle valign=top><table border=0 class=tbcontent><tr><td class=middle>"
+}
+# ---- Footer ---------------------------------------------------------------
+cl_footer2 () {
+ echo "</td></tr></table></td></tr></table>"
+ [ -e /tmp/need.save ] && echo "<br><center><div id=warning>$Wta</div></center>"
+ [ -e /tmp/need.reboot ] && echo "<br><center><div id=warning>$Wtb</div></center>"
+}
+# ---- Rebuild Conf File ---------------------------------------------------
+cl_rebuildconf () {
+ cat /var/lib/lrpkg/*.configs > /tmp/CLDIRECTIVES
+cat << CLEOF > /tmp/buildconf.sh
+#!/bin/sh
+rm /etc/coyote/coyote.conf
+touch /etc/coyote/coyote.conf
+CLEOF
+ chmod 700 /tmp/buildconf.sh
+ cat /tmp/CLDIRECTIVES | while read DIRECTIVE; do
+	echo "[ -z \$${DIRECTIVE} ] || echo ${DIRECTIVE}=\'\$${DIRECTIVE}\' >> /etc/coyote/coyote.conf" >> /tmp/buildconf.sh
+ done
+ . /tmp/buildconf.sh
+ rm /tmp/buildconf.sh
+ rm /tmp/CLDIRECTIVES
+ touch /tmp/need.save
+}

@@ -1,0 +1,51 @@
+#!/bin/sh
+#
+# Coyote PPP Dial-up ip-down script for pppoe/DSL
+#	called by: pppd
+#              called after PPP connection is terminated
+# Created by: Michael Kablitz <mkab@deutschsoft.com>
+# 07-23-2000
+
+
+# This code restores the original resolv.conf saved when ip-up
+# was called by the pppd which uses the `usepeerdns' option and
+# resolv.conf was modified for the supplied dns server adresses.
+#
+
+. /etc/coyote/coyote.conf
+
+iptables="/usr/sbin/iptables"
+tc="/usr/sbin/tc"
+
+logger -p daemon.info -t ip-down "ip-down script called with: ${@}"
+
+[ "$6" ] && { /etc/ppp/"$6"-down "$1" "$2" "$3" "$4" "$5"; exit 0; }
+
+if [ -e /tmp/netsubsys.state ]; then
+	. /tmp/netsubsys.state
+fi
+
+RESOLVFILE="/etc/resolv.conf"
+[ "$USE_DNS_CACHE" = "YES" ] && RESOLVFILE="/etc/resolv.dns"
+if [ -f /etc/ppp/resolv.prev ]; then
+	cp -p /etc/ppp/resolv.prev $RESOLVFILE
+fi 
+
+COUNT=1
+rm -rf /tmp/realdns* > /dev/null
+grep nameserver $RESOLVFILE | while read ALINE ; do
+  echo `echo $ALINE | cut -f 2 -d \ ` > /tmp/realdns$COUNT
+  COUNT=$((COUNT+1))
+done
+         
+if [ -e /var/run/dnsmasq.pid ] ; then
+	kill -hup `cat /var/run/dnsmasq.pid` > /dev/null
+fi
+
+INET_UP=READY
+CONNECTSTRING=
+CONNECTTIME=
+
+. /usr/sbin/write_state.sh
+
+exit 0

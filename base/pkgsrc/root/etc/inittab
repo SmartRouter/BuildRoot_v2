@@ -1,0 +1,4 @@
+::sysinit:/etc/rc.d/rc.sysinit
+::respawn:/sbin/getty 38400 tty1
+tty2::respawn:/sbin/getty 38400 tty2
+tty3::respawn:/sbin/getty 38400 tty3

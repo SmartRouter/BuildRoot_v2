@@ -1,0 +1,4 @@
+./
+./etc/inittab
+./etc/rc.d/rc.sysinit
+./etc/coyote/

@@ -1,0 +1,4 @@
+etc/modules
+etc/rc.d/rc.modules
+lib/modules
+var/lib/lrpkg/modules.*

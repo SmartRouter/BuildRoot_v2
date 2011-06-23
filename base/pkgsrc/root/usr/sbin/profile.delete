@@ -1,0 +1,74 @@
+#!/bin/sh
+#
+# Delete Profiles Script for Coyote Linux
+# Author:  Claudio Roberto Cussuol  
+#          29/05/2005
+#
+
+PROFILES_DIR=/etc/coyote/profiles
+TMP_DIR=/tmp/profile_tmp_dir
+PROFILE_NAME=""
+
+RELOAD_FIREWALL=
+RELOAD_QOS=
+RELOAD_DHCP=
+ASK_CONFIRM=
+
+HELP=
+QUIET=NO
+
+show_usage() {
+  if [ -n "$QUIET" ] ; then
+    echo "profile.delete  Erase a saved profile"
+    echo 
+    echo 'Usage:          profile.load [options] profile-name'
+    echo "Options:        --help  or -h          See this information"
+    echo "                --quiet or -q          Do not show messages"
+    echo "                --yes   or -y          Do not ask for confirmation"
+  fi  
+}
+
+show_error() {
+  rm -rf $TMP_DIR > /dev/null
+  echo
+  echo ERROR: $1
+  exit 1 
+}
+
+while [ -n "$1" ] ; do
+  case "$1" in
+    -h|--help) HELP="YES" ; shift ;;
+    --yes|-y) ASK_CONFIRM="NO" ; shift ;;
+    --help|-h) HELP="YES" ; shift ;;
+    --quiet|-q) QUIET="" ; shift ;;
+    *) PROFILE_NAME="$1"
+       shift ;;
+  esac
+done
+
+if [ -n "$HELP" ] ; then
+  show_usage
+  exit 0
+fi
+if [ -z "$PROFILE_NAME" ] ; then
+  show_usage
+  show_error "Mising profile name"
+fi
+if [ "`echo $PROFILE_NAME | cut -b 1`" = "-" ] ; then
+  show_usage
+  show_error "Invalid Option"
+fi
+
+PROFILE_NAME=`basename $PROFILE_NAME .prf`
+[ ! -e "$PROFILES_DIR/$PROFILE_NAME.prf" ] && show_error "Profile $PROFILE_NAME not found"
+
+if [ -z "$ASK_CONFIRM" ] ; then
+  echo -n "Are you sure you want to delete the profile $PROFILE_NAME ? [N] - "
+  read YN
+  [ "$YN" != "Y" -a "$YN" != "y" ] && exit 0
+fi  
+
+[ -n "$QUIET" ] && echo Deleting profile: $PROFILE_NAME
+rm -rf $PROFILES_DIR/$PROFILE_NAME.prf > /dev/null
+[ $? != 0 ] && show_error "Unable to delete the profile"  
+[ -n "$QUIET" ] && echo Done

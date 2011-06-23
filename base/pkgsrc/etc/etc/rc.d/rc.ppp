@@ -1,0 +1,23 @@
+#!/bin/sh
+#
+# Coyote Dialup PPP Startup Script
+#	Called by: /etc/rc.d/rc.init
+# Created by: Jim Lewis <lightseeker@dmea.net>
+# 05-05-2000
+
+# Dialup PPP Sharing
+# Build the PPP Config files if necessary
+[ "$PPP_CONFIG_OTF" = "YES" ] && . /usr/sbin/mkpppconf.sh
+
+pppd call $PPP_ISP
+if [ $? = 0 ]; then
+	if [ "$PPP_DEMANDDIAL" != "NO" ] ; then
+		INET_UP=READY
+	else
+		INET_UP=YES
+	fi
+else
+	INET_UP=NO
+	echo "The dial-up daemon not started properly"
+	logger "The dial-up daemon not started properly"
+fi

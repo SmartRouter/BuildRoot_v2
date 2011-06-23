@@ -1,0 +1,178 @@
+#!/bin/sh
+#
+# Coyote DHCP client up-down script
+#
+# Called by udhcpc to bring dhcp assinged interfaces up and down
+#
+# Author: Joshua Jackson
+# Date: 06/18/2003
+#
+# Changed by: Claudio Roberto Cussuol <claudio_cl@rictec.com.br> 08-03-2004
+
+dump_info() {
+
+	# Create the interface info file
+	echo dhcp_ip=\'$ip\'
+	echo dhcp_mask=\'$mask\'
+	echo dhcp_router=\'$router\'
+	echo dhcp_broadcast=\'$broadcast\'
+	echo dhcp_hostname=\'$hostname\'
+	echo dhcp_domain=\'$domain\'
+	echo dhcp_mtu=\'$mtu\'
+	echo dhcp_dns=\'${dns}\'
+	echo dhcp_subnet=\'$subnet\'
+
+}
+
+create_resolv () {
+	. /etc/coyote/coyote.conf
+
+      if [ -z "$DNS1" ] ; then
+	if [ ! -z "$dns" ]; then 
+
+           RESOLVFILE="/etc/resolv.conf"
+           [ "$USE_DNS_CACHE" = "YES" ] && RESOLVFILE="/etc/resolv.dns"
+           rm -f $RESOLVFILE
+           touch $RESOLVFILE
+
+           # Create a resolv.conf file from the DHCP info
+           if [ ! -z "$domain" ]; then
+		echo "domain $domain" >> $RESOLVFILE
+	   fi
+        
+	   rm -rf /tmp/realdns* > /dev/null
+	   COUNT=1	
+           for DNSSERV in $dns; do
+		echo "nameserver $DNSSERV" >> $RESOLVFILE
+		echo $DNSSERV > /tmp/realdns$COUNT
+		COUNT=$((COUNT+1))
+	   done
+
+           if [ -e /var/run/dnsmasq.pid ] ; then
+		kill -hup `cat /var/run/dnsmasq.pid`
+		sleep 2  
+           fi
+	fi
+      fi
+}
+
+deconfig_if () {
+
+	# Put the interface in an unconfigured state
+	ip addr flush dev $interface
+	ip link set $interface up
+
+	INET_UP=READY
+	. /usr/sbin/write_state.sh
+}
+
+bind_if () {
+
+	if [ ! -z "$mtu" ]; then
+		ip link set $interface mtu $mtu
+	fi
+
+	IFCMD="ip addr add ${ip}/${mask}"
+	if [ -z "$broadcast" ]; then
+		eval `ipcalc -b ${ip}/${mask} -s`
+		broadcast=$BROADCAST
+	fi
+	IFCMD="$IFCMD broadcast ${broadcast}"
+	IFCMD="$IFCMD dev $interface" 
+
+	`$IFCMD`
+
+	if [ ! -z "$router" ]; then
+		ip route add default via $router
+	fi
+
+	dump_info > /etc/dhcpc/${interface}.info
+
+	create_resolv
+
+	INET_UP=UP
+        . /usr/sbin/write_state.sh
+
+	# Configure the firewall/NAT
+	. /etc/rc.d/rc.line_up $interface
+}
+
+# Renew an existing lease
+renew_if () {
+
+	IPSEC_RESTART=NO
+
+	# Load the info file
+	if [ -r /etc/dhcpc/${interface}.info ]; then
+		. /etc/dhcpc/${interface}.info
+	fi
+
+	# If the MTU has changed, update it
+	if [ ! "$dhcp_mtu" = "$mtu" ]; then
+		ip link set $interface mtu $mtu
+	fi
+
+	# If the subnet mask or the broadcast for the for the network has changed,
+	# some services that are interface bound need to be restarted
+	if [ ! "$dhcp_subnet" = "$subnet" ] && [ ! -z "$subnet" ]; then
+		FIREWALL_RESTART=YES
+		ifconfig $interface netmask $subnet
+	fi
+	
+	if [ -z "$broadcast" ]; then
+		eval `ipcalc -b ${ip}/${mask} -s`
+		broadcast=$BROADCAST
+	fi
+	
+	if [ ! "$dhcp_broadcast" = "$broadcast" ]; then
+		FIREWALL_RESTART=YES
+		ifconfig $interface broadcast $broadcast
+	fi
+
+	# If the default router has changed, delete the current route and recreate it
+	if [ ! "$dhcp_router" = "$router" ]; then
+		FIREWALL_RESTART=YES
+		ip route delete default
+		if [ ! -z "$router" ]; then
+			ip route add default via $router
+		fi
+	fi
+
+	dump_info > /etc/dhcpc/${interface}.info
+
+	INET_UP=UP
+ 	. /usr/sbin/write_status.sh
+
+	# If we need to, restart the firewall/NAT
+	if [ "$FIREWALL_RESTART" = "YES" ]; then
+		. /etc/rc.d/rc.line_up $interface
+	fi
+}
+
+while ! [ -e /tmp/ready ] ; do
+  sleep 1
+done
+
+. /tmp/netsubsys.state
+
+case $1 in
+
+	deconfig)
+		deconfig_if
+		;;
+	bound)
+		bind_if
+		;;
+	renew)
+		renew_if
+		;;
+	nak)
+		logger -p daemon.info -t udhcpc "NAK received for dhcp request."
+		;;
+	leasefail)
+		logger -p daemon.info -t udhcpc "Failed to obtain DHCP lease."
+		;;
+	*)
+		logger -p daemon.info -t udhcpc "Invalid call the udhcpc up-down script"
+		;;
+esac

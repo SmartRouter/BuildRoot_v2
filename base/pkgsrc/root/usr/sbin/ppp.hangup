@@ -1,0 +1,21 @@
+#!/bin/sh
+#
+# PPP link hangup script
+# 
+# Claudio Roberto Cussuol
+# 19/06/2004
+#
+# Source the coyote linux configuration file
+. /etc/coyote/coyote.conf
+
+if [ -f /var/run/ppp0.pid ]; then
+        PID=`cat /var/run/ppp0.pid`      
+	if [ "$INETTYPE" = "PPP" ] ; then
+	       	kill -HUP $PID
+	else
+		kill $PID
+	fi		       	
+	echo "Sent SIGHUP to pppd ($PID)"
+else
+        echo "pppd not running"
+fi

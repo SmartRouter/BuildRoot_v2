@@ -1,0 +1,9 @@
+partition
+libpthread
+libncurses
+libgcc_s
+libstdc
+scp
+lshw
+addnic
+awk
