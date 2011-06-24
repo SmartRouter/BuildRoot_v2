@@ -1,31 +1,36 @@
 #!/bin/sh
-#Build BrazilFW Wellcome Screen
+#Build SmartRouter Wellcome Screen
 #by: Gustavo Lago - Feb/2008 fix: Washington Rodrigues Mar/2008
+#modified in 26/11/2010 --> naufragoweb
 
 . /etc/coyote/coyote.conf
 
 [ -z "$SSH_PORT" ] && SSH_PORT=22
 [ -z "$WEBADMIN_PORT" ] && WEBADMIN_PORT=8180
 [ -z "$ADMIN_AUTH" ] && MESSAGE="password not set yet, press [ENTER]"
-CPUINFO1=$(grep "model name" /proc/cpuinfo | cut -f 2 -d ':' | uniq ; grep MHz /proc/cpuinfo | cut -f 2 -d ':' | uniq ; echo "MHz" ; echo "(`grep -ci "model name" /proc/cpuinfo` x)")
-SRP_INFO=`echo CPU:[1m$CPUINFO1 [0m/ Memory:[1m\`grep "MemTotal" /proc/meminfo |cut -d: -f2\`[1m`
+CPU=`grep "model name" /proc/cpuinfo | cut -f 2 -d ':' | uniq`
+VENDOR=`grep "vendor_id" /proc/cpuinfo | cut -f 2 -d ':' | uniq`
+MEMTOTAL=`grep "MemTotal" /proc/meminfo | awk '{print$2$3}'`
+MEMFREE=`grep "MemFree" /proc/meminfo | awk '{print$2$3}'`
+SYSTIME=`uptime | awk '{print $3$4}' | sed 's/,\+ *$//g'`
+VERSION=`cat /var/lib/lrpkg/root.version`
 echo -ne "
 
 SmartRouter Project
 
-Version: [1m`cat /var/lib/lrpkg/root.version`[0m  
+Version: [1m$VERSION[0m  
 Local IP Address: [1m$LOCAL_IPADDR[0m
 
 This software is licensed by GPL 2.
 
+Processor Vendor = [1m$VENDOR[0m
+CPU              = [1m$CPU[0m
+Mem. Total       = [1m$MEMTOTAL[0m
+Mem. Free        = [1m$MEMFREE[0m
 
-`echo $SRP_INFO | sed 's/[ ]\+/ /g'`
+Uptime: [1m$SYSTIME[0m
 
-
-
-
-
-
+                                 
 
 [0mTo remotely access this router use an SSH client to connect on port [1m$SSH_PORT[0m
 Access the SmartRouter Web Admin by using the URL: [1mhttp://$LOCAL_IPADDR:$WEBADMIN_PORT

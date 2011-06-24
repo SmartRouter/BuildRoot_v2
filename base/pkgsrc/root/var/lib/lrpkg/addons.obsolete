@@ -7,3 +7,4 @@ scp
 lshw
 addnic
 awk
+dhcpd

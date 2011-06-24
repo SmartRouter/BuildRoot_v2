@@ -1,4 +1,5 @@
 #!/bin/sh
+#Version 1.2 (26/11/2010) --> naufragoweb
 
 INSTDIR='/tmp/install'
 SRCDIR_SOURCE="/mnt"
@@ -15,9 +16,9 @@ check_yn() {
 }
 
 abort() {
-   umount $INSTDIR > /dev/null 2&>1 
+   umount $INSTDIR 2&>1 
    rm -rf $INSTDIR
-   umount /mnt > /dev/null 2&>1 
+   umount /mnt 2&>1 
    echo
    echo "[0;31mInstalation Aborted. Press [ENTER][0m"
    echo
@@ -49,40 +50,46 @@ echo
 check_yn "Do you want to go ahead ? (y/n) - "
 [ "$YN" = "N" ] && abort
 
-#SMP=
-#while [ "$SMP" = "" ]; do 
-#      echo
-#      echo "[0;33mDetect your CPU instaled:[0m"
-#      CPU=`cat /proc/cpuinfo | grep "model name" | awk '{print $3}'`
-#      VENDOR=`cat /proc/cpuinfo | grep "vendor id" | awk '{print $3}'`
-#      echo
-#      echo "Vendor = $VENDOR"
-#      echo "CPU    = $CPU"
-#      echo
-#      echo "This system support 64 bits CPU for multiple cores"
-#      echo "If your CPU model multiple cores support, choose the"
-#      echo "kernel SMP for the best performance system."
-#      echo
-#      echo " [0;33m1) kernel single (x86)[0m"
-#      echo
-#      echo " [0;33m2) kernel SMP (x64)[0m"
-#      echo
-#      echo -n "Choose your kernel system : "
-#      read junk
-#      case $junk in
-#           1) SMP="1" ;;
-#           2) SMP="0" ;;
-#           *) { echo "ERROR! Try again!"; SMP="";} ;; 
-#      esac
-#done
-umount $INSTDIR > /dev/null 2&>1
+echo
+echo "[0;33mDetect your CPU instaled:[0m"
+CPU=`grep "model name" /proc/cpuinfo | cut -f 2 -d ':' | uniq`
+VENDOR=`grep "vendor_id" /proc/cpuinfo | cut -f 2 -d ':' | uniq`
+echo
+echo "Vendor   = [1m$VENDOR[0m"
+echo "CPU      = [1m$CPU[0m"
+echo
+echo "SmartRouter system support CPU multiple cores,"
+echo "You choose the kernel single core (1 core CPU)"
+echo "or a kernel SMP cores (2 or + cores CPU)"
+echo 
+SMP=
+while [ "$SMP" = "" ]; do 
+         echo "Options:"
+         echo
+         echo " [0;33m1) kernel single [0m"
+         echo
+         echo " [0;33m2) kernel SMP [0m"
+         echo
+         echo -n "Choose your kernel system : "
+         read junk
+         if [ -z "$junk" ]; then
+              { echo "[0;31mERROR! Try again![0m"; SMP=""; }
+            else
+              case $junk in
+                   1) SMP="0" ;;
+                   2) SMP="1" ;;
+                   *) { echo "[0;31mERROR! Try again![0m"; SMP="";} ;;
+              esac
+         fi
+done
+umount $INSTDIR 2&>1
 rm -rf $INSTDIR
 mkdir  $INSTDIR
 mount tmpfs $INSTDIR -t tmpfs -o size=32M
 
 echo "Reading the install media..."
 . /tmp/boot.info
-mount -o ro $DEVICE /mnt -t $FSTYPE > /dev/null 2&>1 || { echo "Error trying to read the install media."; abort; }
+mount -o ro $DEVICE /mnt -t $FSTYPE 2&>1 || { echo "Error trying to read the install media."; abort; }
 
 for F in `ls /mnt/*.tgz`; do
     F=`basename $F .tgz`
@@ -93,20 +100,18 @@ echo
 echo "Please wait. Reading System files..."
 mkdir $INSTDIR/temp
 mkdir $INSTDIR/temp/config
-cp ${SRCDIR_SOURCE}/*.tgz        $INSTDIR/temp        > /dev/null 2&>1 
-cp ${SRCDIR_SOURCE}/SRP.dpy      $INSTDIR/temp        > /dev/null 2&>1 
-cp ${SRCDIR_SOURCE}/syslinux.cfg $INSTDIR/temp        > /dev/null 2&>1 
-cp ${SRCDIR_SOURCE}/linux        $INSTDIR/temp        > /dev/null 2&>1 
-cp -a ${SRCDIR_SOURCE}/config/*  $INSTDIR/temp/config > /dev/null 2&>1
+cp ${SRCDIR_SOURCE}/*.tgz        $INSTDIR/temp 2&>1 
+cp ${SRCDIR_SOURCE}/SRP.dpy      $INSTDIR/temp 2&>1 
+cp ${SRCDIR_SOURCE}/syslinux.cfg $INSTDIR/temp 2&>1
+cp ${SRCDIR_SOURCE}/linux        $INSTDIR/temp 2&>1  
+cp -a ${SRCDIR_SOURCE}/config/*  $INSTDIR/temp/config 2&>1
 
-#if [ "$SMP" = "0" ]; then
-#   cp ${SRCDIR_SOURCE}/SMP/linux        $INSTDIR/temp        > /dev/null 2&>1
-#   cp ${SRCDIR_SOURCE}/SMP/modules      $INSTDIR/temp        > /dev/null 2&>1
-#else
-#   cp ${SRCDIR_SOURCE}/linux            $INSTDIR/temp        > /dev/null 2&>1
-#fi  
+if [ "$SMP" = "1" ]; then
+   cp ${SRCDIR_SOURCE}/SMP/linux            $INSTDIR/temp 2&>1
+   cp ${SRCDIR_SOURCE}/SMP/modules.tgz      $INSTDIR/temp 2&>1
+fi  
 
-umount /mnt > /dev/null 2&>1
+umount /mnt 2&>1
 hd=
 iface=
 size=
@@ -200,8 +205,8 @@ boot_par="$device"1
 echo
 echo "Trying to detect an upgradable previous version of System Linux"
 echo
-echo "It is normal to see some error messages here, they mean only"
-echo "this HD does not have any previous system version on it"
+echo "[0;31mIt is normal to see some error messages here, they mean only[0m"
+echo "[0;31mthis HD does not have any previous system version on it[0m"
 echo
 mount $boot_par /mnt -t vfat > /dev/null 2&>1
 if [ $? = 0 ]; then
@@ -296,7 +301,7 @@ if [ $? = 0 ]; then
       fi
    fi
 fi
-umount /mnt  > /dev/null 2&>1
+umount /mnt > /dev/null 2&>1
 
 if [ "$format" = "yes" ]; then
    min_part=$(($head*$sect/2048))
@@ -356,15 +361,15 @@ if [ "$format" = "yes" ]; then
                  mbs_cache=
             fi
       done;
-      defautl_cache_par=ext2 
       echo
+      echo "[0;34m          +++++++++++++++++++++++++++++++++++++++++++++++++[0m"
+      echo "[0;34m          +         Type for second partition             +[0m"
+      echo "[0;34m          +++++++++++++++++++++++++++++++++++++++++++++++++[0m"
+      echo
+      echo "The filesystem recommended format second partition is ext2 (option recommended)"
+      echo
+      defautl_cache_par=
       while [ "$type_cache_par" = "" ]; do
-            echo "[0;34m          +++++++++++++++++++++++++++++++++++++++++++++++++[0m"
-            echo "[0;34m          +         Type for second partition             +[0m"
-            echo "[0;34m          +++++++++++++++++++++++++++++++++++++++++++++++++[0m"
-            echo
-            echo "The filesystem default format second partition is ext2 (option recommended)"
-            echo
             echo "Options:"
             echo
             echo "[0;33m1 ) ext2[0m"
@@ -374,17 +379,17 @@ if [ "$format" = "yes" ]; then
             echo -n "Choose the type for filesystem on second partition : "
             read junk
             if [ -z "$junk" ]; then
-               { type_cache_par=$defautl_cache_par; echo "The default value (ext2) are selected."; }
+               { type_cache_par=""; echo "[0;31mERROR! Try again![0m"; }
             else
                case $junk in 
                     1 )
-                       { type_cache_par=$defautl_cache_par; echo "The default value (ext2) are selected."; }
+                       { type_cache_par=ext2; echo "The default value (ext2) are selected."; }
                        ;;
                     2 )
                        { type_cache_par=ext3; echo "The filesystem ext3 are selected."; }
                        ;;
                     * )
-                       { type_cache_par=$defautl_cache_par; echo "The default value (ext2) are selected."; }
+                       { echo "[0;31mERROR! Try again![0m"; type_cache_par="";}
                        ;;
                esac
             fi
@@ -425,9 +430,9 @@ if [ "$format" = "yes" ]; then
  
    if [ "$use_cache" = "yes" ]; then
       echo
-      echo "[0;33m            =======================================================[0m"
-      echo "[0;33m             Creating Linux file system on second partition...[0m"
-      echo "[0;33m            =======================================================[0m"
+      echo "[0;33m         =======================================================[0m"
+      echo "[0;33m          Creating Linux file system on second partition...[0m"
+      echo "[0;33m         =======================================================[0m"
       /bin/mke2fs $cache_par -F -m 0 -i 16384 -b 4096 || { echo "Error Creating LINUX file system ext2 on second partition"; abort; }
       case "$type_cache_par" in
         ext2 )
@@ -483,7 +488,7 @@ echo
 echo "Copying Files. Please wait..."
 
 if [ "$upgrade_addons" = "yes" ]; then
-   cp $INSTDIR/oldpacks/* /mnt > /dev/null 2&>1
+   cp $INSTDIR/oldpacks/* /mnt 2&>1
 else
    [ -e $INSTDIR/pkg.list2 ] && cat $INSTDIR/pkg.list2 | while read f; do
                                                                [ -n "$f" ] && rm -rf /mnt/$f.tgz
@@ -496,17 +501,17 @@ if [ "$have_obsolete" = "yes" ]; then
                                                          done;
 fi
 
-cp $INSTDIR/temp/* /mnt > /dev/null 2&>1
-mkdir /mnt/config > /dev/null 2&>1
-cp -a $INSTDIR/temp/config/* /mnt/config > /dev/null 2&>1
+cp $INSTDIR/temp/* /mnt 2&>1
+mkdir /mnt/config 2&>1
+cp -a $INSTDIR/temp/config/* /mnt/config 2&>1
 
 if [ "$upgrade" = "yes" ]; then
-   cp -a $INSTDIR/upgrade/* /mnt/config > /dev/null 2&>1
+   cp -a $INSTDIR/upgrade/* /mnt/config 2&>1
    [ -e $INSTDIR/ssh_keys.tgz ] && cp $INSTDIR/ssh_keys.tgz /mnt
 fi
 sync
 
-umount $INSTDIR > /dev/null 2&>1
+umount $INSTDIR 2&>1
 rm -rf $INSTDIR
 umount /mnt
 echo

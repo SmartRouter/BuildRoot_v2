@@ -2,7 +2,7 @@
 
 ###########################################################
 # LSNET - Network Device 1.3 by Washington Rodrigues 2008 #
-# Corrigido      por   thiagofw    05/04/2010             #
+# Revised and corrected by Marcos do Vale - 24/04/2010    #
 ###########################################################
 IRQC=0
 IOHA=0
@@ -12,8 +12,9 @@ NETWORK=`/sbin/lshw -disable ide -disable cpuid -C network -xml 2>/dev/null`
 if [ "$1" != "-short" ]; then
    echo "Loading information..." >&2
    echo "" >&2
-   echo " LSNET - Network Device 1.3  "
-   echo "============================="
+   echo " LSNET - Network Device 1.3 by Washington Rodrigues 2008 "
+   echo " LSNET - Revised and corrected by Marcos do Vale    2010 "
+   echo "========================================================="
    echo
 fi
 
@@ -81,7 +82,6 @@ echo "$NETWORK" | grep -i "<physid\>" | sed s/[^0123456789abcef]//g | sort | whi
                    DRIVER="$(get_value "driver")"
                    IRQ="$(get_resource "irq")"
                    IOPORT="$(get_resource "ioport")"; [ "$IOPORT" = "UNKNOWN" ] && IOHA=$((IOHA+1))
-                   [ -z "$IOPORT" ] && IOPORT="N/A"
                    DEVICEID="$PHYSICAL"
                    VENDOR="$(get_dat "vendor")"
                    MODEL="$(get_dat "product")"
@@ -93,11 +93,13 @@ echo "$NETWORK" | grep -i "<physid\>" | sed s/[^0123456789abcef]//g | sort | whi
                    [ -z "$SPEED" ] && SPEED="UNKNOWN"
                    ethinfo "$INTERFACE"
 
-                   
+                   [ -z "$IOPORT" ] && IOPORT="N/A"
                    if [ "$1" != "-short" ]; then
                       if [ -z "$IRQ" ]; then
                          IRQ="N/A";IRQC=$((IRQC+1))
                       fi
+                   fi 
+                   if [ "$1" != "-short" ]; then
                       echo "Device ID....: $DEVICEID"
                       echo "Vendor.......: $VENDOR"
                       echo "Model........: $MODEL"

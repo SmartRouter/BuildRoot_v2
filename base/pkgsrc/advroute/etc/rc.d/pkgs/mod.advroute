@@ -1,8 +1,0 @@
-echo Loading Advanced Router modules...
-while read module args
-do
- case "$module" in
-	\#*|"") continue ;;
- esac
- insmod /lib/modules/advroute/"$module".o $args > /dev/null
-done < /etc/modules.advroute

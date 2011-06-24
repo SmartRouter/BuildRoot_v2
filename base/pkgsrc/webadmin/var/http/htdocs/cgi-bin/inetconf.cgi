@@ -8,7 +8,7 @@
 
 SCRIPT="inetconf.cgi"
 
-mount_configuration() {
+mount_configuration_1() {
 case $INETTYPE in
  "ETHERNET_DHCP")
 	DHCPHOSTNAME=$FORM_DHCPHOSTNAME
@@ -39,7 +39,7 @@ case $INETTYPE in
 	NETMASK=
 	GATEWAY=
 	MAC_SPOOFING=
-;;
+ ;;
  "PPP")
 	[ "$FORM_DEMANDMODE" = "NO" ] && PPP_DEMANDDIAL=NO || PPP_DEMANDDIAL=$FORM_IDLETIME
 	PPP_USERNAME=$FORM_USERNAME
@@ -58,91 +58,115 @@ case $INETTYPE in
 	[ -z "$PPP_PHONENUM" ] && echo "<center><div id=back>$Pmj<br><i>$Pmk</i></div></center><br>"
 	[ -z "$PPP_MODEMTTY" ] && echo "<center><div id=back>$Pml<br><i>$Pmm</i></div></center><br>"
 	[ -z "$PPP_LOCALREMOTE" ] && echo "<center><div id=back>$Pmn<br><i>$Pmo</i></div></center><br>"
+ ;;
 esac
+IF_INET=$FORM_IF_INET
+commit
+alert_inet "WAN1"
+}
+mount_configuration_2(){
 IF_INET2=$FORM_IF_INET2
 INET2_IPADDR=$FORM_INET2_IPADDR
 INET2_NETMASK=$FORM_INET2_NETMASK
 INET2_GATEWAY=$FORM_INET2_GATEWAY
+commit
+alert_inet "WAN2"
+}
+mount_configuration_3(){
 IF_INET3=$FORM_IF_INET3
 INET3_IPADDR=$FORM_INET3_IPADDR
 INET3_NETMASK=$FORM_INET3_NETMASK
 INET3_GATEWAY=$FORM_INET3_GATEWAY
+commit
+alert_inet "WAN3"
+}
+mount_configuration_4(){
 IF_INET4=$FORM_IF_INET4
 INET4_IPADDR=$FORM_INET4_IPADDR
 INET4_NETMASK=$FORM_INET4_NETMASK
 INET4_GATEWAY=$FORM_INET4_GATEWAY
+commit
+alert_inet "WAN4"
+}
+mount_configuration_D(){
 DOMAINNAME=$FORM_DOMAINNAME
 DNS1=$FORM_DNS1
 DNS2=$FORM_DNS2
 DNS3=$FORM_DNS3
-IF_INET=$FORM_IF_INET
-cl_rebuildconf
-. /usr/sbin/write_state.sh
-echo "<center><div id=alerta>$Wsv<br><a href=backup.cgi class=links>$Wtl</a></div>
-<br><div id=back><a href=$SCRIPT class=links>$Egj</a><br></div></center>"
+commit
+alert_inet "DNS"
 }
 
-show_() {
-#for i in "ETHERNET_DHCP" "ETHERNET_STATIC" "PPPoE" "PPP"; do
-cat << CLEOF
-<form method="POST" action="$SCRIPT"><table class=maintable border=0 width="100%"><tr><th colspan=2>$Eia</th></tr>
-<tr><td class=row1 align=right><b>$Icc</b><br><small></small></td>
- <td width=50% class=row2><select name=INETTYPE>
-	<option value=ETHERNET_DHCP `[ "$INETTYPE" = "ETHERNET_DHCP" ] && echo selected`>DHCP</option>
-	<option value=ETHERNET_STATIC `[ "$INETTYPE" = "ETHERNET_STATIC" ] && echo selected`>STATIC</option>
-	<option value=PPPOE `[ "$INETTYPE" = "PPPOE" ] && echo selected`>PPPOE</option>
-	<option value=PPP `[ "$INETTYPE" = "PPP" ] && echo selected`>PPP</option>
- </select><input type=submit value="$Fsb" name=OKBTN></td></tr>
- <tr><th colspan=2>$Ptk</th></tr>
-CLEOF
+commit(){
+cl_rebuildconf
+. /usr/sbin/write_state.sh
+}
+alert_inet(){
+echo "<center><div id=alerta>$Wsv<br>
+<a href=$SCRIPT?ACTION=$1 class=lnk><u>$Egj</u></a><br>
+<a href=backup.cgi class=lnk><u>$Wtl</u></a></div></center><br><br>"
+}
+
+show_form_head(){
+init_table "$SCRIPT"
+ init_add_control "$Eia"
+	add_control "$SCRIPT?ACTION=WAN1" "$Ptk"
+	add_control "$SCRIPT?ACTION=WAN2" "$Ptl"
+	add_control "$SCRIPT?ACTION=WAN3" "$Ptm"
+	add_control "$SCRIPT?ACTION=WAN4" "$Ptn"
+	add_control "$SCRIPT?ACTION=DNS" "DNS"
+ end_add_control
+end_table
+init_form "$SCRIPT"
+init_main_table
+}
+
+show_form_end(){
+end_table
+ echo "<p align=center><input type=submit value=\"$1\" name=OKBTN>&nbsp;<input type=reset value=\"$Fer\"></p></form>"
+}
+
+show_form_1(){
+create_network_graph
+show_form_head
+add_title "$Eia"
+ form_info_item "$Icc" "" "$(init_combobox "INETTYPE") \
+				$(add_item_combobox "ETHERNET_DHCP" "DHCP" "`[ "$INETTYPE" = "ETHERNET_DHCP" ] && echo selected`") \
+				$(add_item_combobox "ETHERNET_STATIC" "STATIC" "`[ "$INETTYPE" = "ETHERNET_STATIC" ] && echo selected`") \
+				$(add_item_combobox "PPPOE" "PPPOE" "`[ "$INETTYPE" = "PPPOE" ] && echo selected`") \
+				$(add_item_combobox "PPP" "PPP" "`[ "$INETTYPE" = "PPP" ] && echo selected`")
+			  $(end_combobox)<input type=submit value="$Fsb" name=OKBTN>"
+add_title "$Ptk"
  case $INETTYPE in
 	ETHERNET_DHCP)
-cat << CLEOF
-<tr><td class=row1 align=right><b>$Psd</td>
- <td class=row2><input type=text name=IF_INET value="${IF_INET}" size=5></td></tr>
-<tr><td class=row1 align=right>$Ema $Emb<br></td>
- <td class=row2><input type=text name=DHCPHOSTNAME value="${DHCPHOSTNAME}" size=20></center></td></tr>
-<tr><td class=row1 align=right><b>$Efn</b><br>$Euo</td>
- <td class=row2><input type=text name=MAC_SPOOFING value="${MAC_SPOOFING}" size=20></td></tr>
-CLEOF
+	 form_info_item "$Psd" "" "$(input_text "IF_INET" "${IF_INET}" "5")"
+	 form_info_item "$Ema $Emb" "" "$(input_text "DHCPHOSTNAME" "${DHCPHOSTNAME}" "20")"
+	 form_info_item "$Efn" "$Euo" "$(input_text "MAC_SPOOFING" "${MAC_SPOOFING}" "20")"
 	;;
 	ETHERNET_STATIC)
-cat << CLEOF
-<tr><td class=row1 align=right><b>$Psd</td>
- <td class=row2><input type=text name=IF_INET value="${IF_INET}" size=5></td></tr>
-<tr><td class=row1 align=right><b>$Lpi<br>$Wed $Anm</b></td>
- <td class=row2><input type=text name=IPADDR value="${IPADDR}" size=20><br><input type=text name=NETMASK value="${NETMASK}" size=20></td></tr>
-<tr><td class=row1 align=right><b>$Lpj<br>$Wed $Anm</b></td>
- <td class=row2><input type=text name=IPADDR2 value="${IPADDR2}" size=20><br><input type=text name=NETMASK2 value="${NETMASK2}" size=20></td></tr>
-<tr><td class=row1 align=right><b>$Lpk<br>$Wed $Anm</b></td>
- <td class=row2><input type=text name=IPADDR3 value="${IPADDR3}" size=20><br><input type=text name=NETMASK3 value="${NETMASK3}" size=20></td></tr>
-<tr><td class=row1 align=right><b>$Edg</b></td>
- <td class=row2><input type=text name=GATEWAY value="${GATEWAY}" size=20></td></tr>
-<tr><td class=row1 align=right><b>$Efn</b><br>$Euo</td>
- <td class=row2><input type=text name=MAC_SPOOFING value="${MAC_SPOOFING}" size=20></td></tr>
-CLEOF
+	 form_info_item "$Psd" "" "$(input_text "IF_INET" "${IF_INET}" "5")"
+	 form_info_item "$Lpi<br>$Wed $Anm" "" "$(input_text "IPADDR" "${IPADDR}" "20")<br>$(input_text "NETMASK" "${NETMASK}" "20")"
+	 form_info_item "$Lpj<br>$Wed $Anm" "" "$(input_text "IPADDR2" "${IPADDR2}" "20")<br>$(input_text "NETMASK2" "${NETMASK2}" "20")"
+	 form_info_item "$Lpk<br>$Wed $Anm" "" "$(input_text "IPADDR3" "${IPADDR3}" "20")<br>$(input_text "NETMASK3" "${NETMASK3}" "20")"
+	 form_info_item "$Edg" "" "$(input_text "GATEWAY" "${GATEWAY}" "20")"
+	 form_info_item "$Efn" "$Euo" "$(input_text "MAC_SPOOFING" "${MAC_SPOOFING}" "20")"
 	;;
 	PPPOE)
-          if [ "$PPPOE_IDLE" = "NO" ]; then
-            CHK1=checked
-            CHK2=
-            IDLE=
-          else
-            CHK1=
-            CHK2=checked
-            IDLE=$PPPOE_IDLE
-	  fi
-cat << CLEOF
-<tr><td class=row1 align=right><b>$Psd</td>
- <td class=row2><input type=text name=IF_INET value="${IF_INET}" size=5></td></tr>
-<tr><td align=right class=row1><b>$Ioc</b><br>$Iot</td>
- <td class=row2><input type=radio value=NO ${CHK1} name=DEMANDMODE>$Ikc<br><input type=radio value=YES ${CHK2} name=DEMANDMODE>$Iuc<br>
-$Itm: &nbsp;<input type=text name=DEMANDTIME value="${IDLE}" size=4>&nbsp;$Wsc</td></tr>
-<tr><td class=row1 align=right><b>PPPoE $Ius</b></td>
- <td class=row2><INPUT name=USERNAME value="${PPPOE_USERNAME}" size=20></td></tr>
-<tr><td class=row1 align=right><b>PPPoE $Ips</b></td>
- <td class=row2><INPUT type=password name=PASSWORD1 value="${PPPOE_PASSWORD}" size=20></td></tr>
-CLEOF
+	 if [ "$PPPOE_IDLE" = "NO" ]; then
+		CHK1=checked
+		CHK2=
+		IDLE=
+	 else
+		CHK1=
+		CHK2=checked
+		IDLE=$PPPOE_IDLE
+	 fi
+	 form_info_item "$Psd" "" "$(input_text "IF_INET" "${IF_INET}" "5")"
+	 form_info_item "PPPoE $Ius" "" "$(input_text "USERNAME" "${PPPOE_USERNAME}" "20")"
+	 form_info_item "PPPoE $Ips" "" "<input type=password name=PASSWORD1 value=\"${PPPOE_PASSWORD}\" size=20"
+	 form_info_item "$Ioc" "$Iot" "$(input_radio "DEMANDMODE" "NO" "$Ikc" "${CHK1}")<br> \
+	 			       $(input_radio "DEMANDMODE" "YES" "$Iuc" "${CHK2}")<br> \
+	 			       $Itm $(input_text "DEMANDTIME" "${IDLE}" "4") $Wsc"
 	;;
 	PPP)
 	 if [ "$PPP_DEMANDDIAL" = "NO" ]; then
@@ -170,63 +194,75 @@ CLEOF
 		CHK6=checked
 		STATICIP=$PPP_STATICIP
 	 fi
-cat << CLEOF
-<tr><td class=row1 align=right width="50%" rowspan=2><b>$Plb</b><br>$Plc $Pld</td><td class=row2><input type=radio value=NO ${CHK1} name=DEMANDMODE>$Ple</td></tr>
-<tr><td class=row2><input type=radio value=YES ${CHK2} name=DEMANDMODE>$Plf<br>$Plg &nbsp;<input type=text name=IDLETIME value="${IDLE}" size=4>&nbsp;$Plh</td></tr>
-<tr><td class=row1 align=right><b>$Pli</b><br>$Plj</td><td class=row2><input type=text name=MODEMDEV size=16 value="$PPP_MODEMTTY"></td></tr>
-<tr><td class=row1 align=right><b>$Plk</b><br>$Plm</td><td class=row2><input type=text name=PORTSPEED size=16 value="$PPP_PORTSPEED"></td></tr>
-<tr><td class=row1 align=right><b>$Pln</b><br>$Plo 'ATZ' $Plp 'AT&FS11=55' $Plq</td><td class=row2><input type=text name=MODEMINIT size=16 value="$PPP_INITSTR"></td></tr>
-<tr><td class=row1 align=right><b>$Plr</b><br>$Pls</td><td class=row2><input name=PHONENUM size=16 value="$PPP_PHONENUM"></td></tr>
-<tr><td class=row1 align=right><b>$Ius</b><br>$Plt</td><td class=row2><input name=USERNAME size=16 value="$PPP_USERNAME"></td></tr>
-<tr><td class=row1 align=right><b>$Ips</b><br>$Plu</td><td class=row2><input type=password name=PASSWORD1 size=16 value="$PPP_PASSWORD"></td></tr>
-<tr><td class=row1 align=right><b>$Plw</b><br>$Plv ($Plx)</td></td><td class=row2><input type=radio name="CHATLOGIN" $CHK4 value=YES>$Fye &nbsp;<input type=radio name="CHATLOGIN" $CHK3 value=NO>$Fno</td></tr>
-<tr><td class=row1 align=right rowspan=2><b>$Pmb</b><br>$Pmc</td><td class=row2><input type=radio name=STATIC $CHK6 value=YES>$Fye ($Pmd)<br>$Pme &nbsp;<input name=STATICIP size="16" value="$STATICIP"></td></tr>
-<tr><td class=row2><input type=radio name=STATIC $CHK5 value=NO>$Fno ($Pmf)<br>$Pmg &nbsp;<input name=LOCALREMOTE size=16 value="$PPP_LOCALREMOTE"></td></tr>
-CLEOF
+	 form_info_item "$Pli" "$Plj" "$(input_text "MODEMDEV" "${PPP_MODEMTTY}" "16")"
+	 form_info_item "$Plk" "$Plm" "$(input_text "PORTSPEED" "${PPP_PORTSPEED}" "16")"
+	 form_info_item "$Pln" "$Plo 'ATZ' $Plp 'AT&FS11=55' $Plq" "$(input_text "MODEMINIT" "${PPP_INITSTR}" "16")"
+	 form_info_item "$Plr" "$Pls" "$(input_text "PHONENUM" "${PPP_PHONENUM}" "16")"
+	 form_info_item "$Ius" "$Plt" "$(input_text "USERNAME" "${PPP_USERNAME}" "16")"
+	 form_info_item "$Ips" "$Plu" "<input type=password name=PASSWORD1 size=16 value=\"$PPP_PASSWORD\">"
+	 form_info_item "$Plb" "$Plc $Pld" "$(input_radio "DEMANDMODE" "NO" "$Ple" "${CHK1}")<br> \
+	 				    $(input_radio "DEMANDMODE" "YES" "$Plf" "${CHK2}")<br> \
+	 				    $Plg $(input_text "IDLETIME" "${IDLE}" "4") $Plh"
+	 form_info_item "$Plw" "$Plv ($Plx)" "$(input_radio "CHATLOGIN" "YES" "$Fye" "${CHK4}") \
+	 				      $(input_radio "CHATLOGIN" "NO" "$Fno" "${CHK3}")"
+	 form_info_item "$Pmb" "$Pmc" "$(input_radio "STATIC" "YES" "$Fye ($Pmd)<br>$Pme" "${CHK6}") \
+	 			       $(input_text "STATICIP" "${STATICIP}" "16")<br> \
+	 			       $(input_radio "STATIC" "NO" "$Fno ($Pmf)<br>$Pmg" "${CHK5}") \
+	 			       $(input_text "LOCALREMOTE" "${PPP_LOCALREMOTE}" "16")"
 	;;
  esac
-
-cat << CLEOF
-<tr><th colspan=2>$Ptl</th></tr>
-<tr><td class=row1 align=right><b>$Psd</b></td><td class=row2 ><input type=text name=IF_INET2 size=5 value="${IF_INET2}"></td></tr>
-<tr><td class=row1 align=right><b>$Lpi<br>$Anm<br>$Wed $Edg</b></td><td class=row2>
-<input type=text name=INET2_IPADDR size=20 value="${INET2_IPADDR}"><br>
-<input type=text name=INET2_NETMASK size=20 value="${INET2_NETMASK}"><br>
-<input type=text name=INET2_GATEWAY size=20 value="${INET2_GATEWAY}"><br></td></tr>
-<tr><th colspan=2>$Ptm</th></tr>
-<tr><td class=row1 align=right><b>$Psd</b></td><td class=row2 ><input type=text name=IF_INET3 size=5 value="${IF_INET3}"></td></tr>
-<tr><td class=row1 align=right><b>$Lpi<br>$Anm<br>$Wed $Edg</b></td><td class=row2>
-<input type=text name=INET3_IPADDR size=20 value="${INET3_IPADDR}"><br>
-<input type=text name=INET3_NETMASK size=20 value="${INET3_NETMASK}"><br>
-<input type=text name=INET3_GATEWAY size=20 value="${INET3_GATEWAY}"><br></td></tr>
-
-<tr><th colspan=2>$Ptn</th></tr>
-<tr><td class=row1 align=right><b>$Psd</b></td><td class=row2 ><input type=text name=IF_INET4 size=5 value="${IF_INET4}"></td></tr>
-<tr><td class=row1 align=right><b>$Lpi<br>$Anm<br>$Wed $Edg</b></td><td class=row2>
-<input type=text name=INET4_IPADDR size=20 value="${INET4_IPADDR}"><br>
-<input type=text name=INET4_NETMASK size=20 value="${INET4_NETMASK}"><br>
-<input type=text name=INET4_GATEWAY size=20 value="${INET4_GATEWAY}"><br></td></tr>
-
-<tr><th colspan=2>DNS</th></tr>
-<tr><td class=row1 align=right><b>$Afs $Ids</b></td><td class=row2 ><input type=text name=DNS1 value="${DNS1}" size=20></td></tr>
-<tr><td class=row1 align=right><b>$And $Ids</b></td><td class=row2 ><input type=text name=DNS2 value="${DNS2}" size=20></td></tr>
-<tr><td class=row1 align=right><b>$Ard $Ids</b></td><td class=row2 ><input type=text name=DNS3 value="${DNS3}" size=20></td></tr>
-<tr><td class=row1 align=right><b>$Edn</b></td><td class=row2 ><input type=text name=DOMAINNAME value="${DOMAINNAME}" size=20></td></tr>
-
-</table><p align=center><input type=submit value="$Fsv" name=OKBTN>&nbsp;<input type=reset value="$Fer"></p></form>
-CLEOF
+show_form_end "WAN1"
+}
+show_form_2(){
+show_form_head
+add_title "$Ptl"
+ form_info_item "$Psd" "" "$(input_text "IF_NET2" "${IF_NET2}" "5")"
+ form_info_item "$Lpi,<br>$Anm<br>$Wed $Edg" "" "$(input_text "INET2_IPADDR" "${INET2_IPADDR}" "20")<br>$(input_text "INET2_NETMASK" "${INET2_NETMASK}" "20")<br>$(input_text "INET2_GATEWAY" "${INET2_GATEWAY}" "20")"
+show_form_end "WAN2"
+}
+show_form_3(){
+show_form_head
+add_title "$Ptm"
+ form_info_item "$Psd" "" "$(input_text "IF_NET3" "${IF_NET3}" "5")"
+ form_info_item "$Lpi,<br>$Anm<br>$Wed $Edg" "" "$(input_text "INET3_IPADDR" "${INET3_IPADDR}" "20")<br>$(input_text "INET3_NETMASK" "${INET3_NETMASK}" "20")<br>$(input_text "INET3_GATEWAY" "${INET3_GATEWAY}" "20")"
+show_form_end "WAN3"
+}
+show_form_4(){
+show_form_head
+add_title "$Ptn"
+ form_info_item "$Psd" "" "$(input_text "IF_NET4" "${IF_NET4}" "5")"
+ form_info_item "$Lpi,<br>$Anm<br>$Wed $Edg" "" "$(input_text "INET4_IPADDR" "${INET4_IPADDR}" "20")<br>$(input_text "INET4_NETMASK" "${INET4_NETMASK}" "20")<br>$(input_text "INET4_GATEWAY" "${INET4_GATEWAY}" "20")"
+show_form_end "WAN4"
+}
+show_form_D(){
+show_form_head
+add_title "DNS"
+ form_info_item "$Afs $Ids" "" "$(input_text "DNS1" "${DNS1}" "20")"
+ form_info_item "$Afs $Ids" "" "$(input_text "DNS2" "${DNS2}" "20")"
+ form_info_item "$Afs $Ids" "" "$(input_text "DNS3" "${DNS3}" "20")"
+ form_info_item "$Edn" "" "$(input_text "DOMAINNAME" "${DOMAINNAME}" "20")"
+show_form_end "WLAN"
 }
 
 cl_header2 "$Ecf"
 case "$FORM_OKBTN" in
- "$Fsv")
-	mount_configuration
+ "WAN1") INETTYPE=$FORM_INETTYPE
+		 mount_configuration_1 
+		 ;;
+ "WAN2") mount_configuration_2 ;;
+ "WAN3") mount_configuration_3 ;;
+ "WAN4") mount_configuration_4 ;;
+ "DNS")	mount_configuration_D ;;
+ *)  
+	case "$FORM_ACTION" in
+	 "WAN1") show_form_1 ;;
+	 "WAN2") show_form_2 ;;
+	 "WAN3") show_form_3 ;;
+	 "WAN4") show_form_4 ;;
+	 "DNS") show_form_D ;;
+	 *)	show_form_1 ;;
+	esac
  ;;
- "$Fsb")
-	INETTYPE=$FORM_INETTYPE
-	mount_configuration
- ;;
- *) show_ ;;
 esac
 cl_footer2
 

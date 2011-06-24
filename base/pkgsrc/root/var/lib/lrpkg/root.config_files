@@ -11,3 +11,4 @@ subnet.cfg subnet.cfg
 dnsmasq.cfg ../dnsmasq.conf.template
 rclocal.cfg ../rc.d/rc.local
 route.cfg route.cfg
+dhcpd.leases ../../var/state/dhcp/dhcpd.leases

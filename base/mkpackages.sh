@@ -106,16 +106,18 @@ buildall() {
 #  create_root
 
   cd pkgsrc
-  buildpkg advroute
+#  buildpkg advroute
   buildpkg bridge
-  buildpkg dhcpd
+#  buildpkg dhcpd
   buildpkg etc
   buildpkg iwtools
-  buildpkg l7filter
+#  buildpkg l7filter
   buildpkg root
   buildpkg webadmin
   buildpkg modules
-  buildpkg drivers
+  buildpkg modules_smp
+  mv ../packages/modules_smp.tgz ../packages/SMP/modules.tgz
+#  buildpkg drivers
   buildpkg hdtools
   buildpkg hdparm
   buildpkg language
@@ -138,6 +140,7 @@ reset_all() {
   echo "Cleaning...."
 
   rm -f ../cd/*.tgz 1>&2 > /dev/null
+  rm -f ../cd/SMP/*.tgz 1>&2 > /dev/null
 
   #rm -f pkgsrc/modules/etc/modules
   #rm -f pkgsrc/modules/lib/modules/*.o 1>&2 > /dev/null

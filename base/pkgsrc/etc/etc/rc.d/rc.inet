@@ -20,13 +20,13 @@ if [ -z "$IF_INET" ]; then
  if [ "$INETTYPE" != "PPPOE" ] || ip link set eth1 mtu 1500 >/dev/null 2>&1; then
 	IF_INET=eth1
  else
- 	IF_INET=$IF_LOCAL
+	IF_INET=$IF_LOCAL
  fi
 fi
 
 if [ -n "$DMZ_IPADDR" ] ; then
  if [ -z "$IF_DMZ" ]; then
- 	[ "$INETTYPE" = "PPP" ] && IF_DMZ=eth1 || IF_DMZ=eth2
+	[ "$INETTYPE" = "PPP" ] && IF_DMZ=eth1 || IF_DMZ=eth2
  fi
  DMZ_UP=DOWN
 fi
@@ -37,8 +37,8 @@ LOCAL_UP=DOWN
 . /usr/sbin/write_state.sh
 
 if [ -n "$MAC_SPOOFING" ]; then
-	echo "Setting up MAC address $MAC_SPOOFING on $IF_INET ..."
-	ifconfig $IF_INET hw ether $MAC_SPOOFING
+ echo "Setting up MAC address $MAC_SPOOFING on $IF_INET ..."
+ ifconfig $IF_INET hw ether $MAC_SPOOFING
 fi
 
 # Set the hostname
@@ -50,75 +50,89 @@ hostname $HOSTNAME
 [ -z "$DOMAINNAME" -a -n "$DHCPD_DOMAIN" ] && DOMAINNAME="$DHCPD_DOMAIN"
 [ -z "$DOMAINNAME" ] && DOMAINNAME="localdomain"
 
-# Set the idle connection timeout to 1 hour
-echo 3600 > /proc/sys/net/ipv4/netfilter/ip_conntrack_tcp_timeout_established
-echo 50 >	/proc/sys/net/ipv4/netfilter/ip_conntrack_generic_timeout #600
-echo 5 >	/proc/sys/net/ipv4/netfilter/ip_conntrack_tcp_timeout_close #10
-echo 5 >	/proc/sys/net/ipv4/netfilter/ip_conntrack_tcp_timeout_close_wait #60
-echo 5 >	/proc/sys/net/ipv4/netfilter/ip_conntrack_tcp_timeout_fin_wait #120
-echo 5 >	/proc/sys/net/ipv4/netfilter/ip_conntrack_tcp_timeout_time_wait #120
-echo 5 >	/proc/sys/net/ipv4/netfilter/ip_conntrack_udp_timeout #30
+echo 100 5000 640 2560 150 30000 5000 1884 2 > /proc/sys/vm/bdflush
 
 # Some additional IP security tweaks
+#http://www.kernel.org/doc/man-pages/online/pages/man7/tcp.7.html
+#http://www.kernel.org/doc/man-pages/online/pages/man7/ip.7.html
+#http://www.kernel.org/doc/man-pages/online/pages/man7/arp.7.html
+#http://www.kernel.org/doc/man-pages/online/pages/man7/socket.7.html
+echo 400 >	/proc/sys/net/unix/max_dgram_qlen #10
+echo 400 >	/proc/sys/net/core/message_burst #50
+echo 2800 >	/proc/sys/net/core/mod_cong #290
+echo 1000 >	/proc/sys/net/core/lo_cong #100
+echo 200 >	/proc/sys/net/core/no_cong #20
+echo 2900 >	/proc/sys/net/core/no_cong_thresh #10
+#Maximum number of packets in the global input queue
+echo 4096 >	/proc/sys/net/core/netdev_max_backlog #300
+echo 2048 >	/proc/sys/net/core/somaxconn #128
+
+#default setting in bytes of the socket receive/send buffer
+echo 262144 > /proc/sys/net/core/rmem_default #108544
+echo 262144 > /proc/sys/net/core/rmem_max
+echo 262144 > /proc/sys/net/core/wmem_default #108544
+echo 262144 > /proc/sys/net/core/wmem_max
+#Maximum length of ancillary data and user control data like the iovecs per socket
+echo 20480 >	 /proc/sys/net/core/optmem_max #10240
+
+# Set the idle connection timeout to 1 hour
+echo 3600 >	/proc/sys/net/ipv4/netfilter/ip_conntrack_tcp_timeout_established
+echo 300 >	/proc/sys/net/ipv4/netfilter/ip_conntrack_generic_timeout #600
+echo 5 >	/proc/sys/net/ipv4/netfilter/ip_conntrack_tcp_timeout_close #10
+echo 30 >	/proc/sys/net/ipv4/netfilter/ip_conntrack_tcp_timeout_close_wait #60
+echo 60 >	/proc/sys/net/ipv4/netfilter/ip_conntrack_tcp_timeout_fin_wait #120
+echo 60 >	/proc/sys/net/ipv4/netfilter/ip_conntrack_tcp_timeout_time_wait #120
+echo 20 >	/proc/sys/net/ipv4/netfilter/ip_conntrack_udp_timeout #30
+
+#echo 15 >	/proc/sys/net/ipv4/route/gc_elasticity #8
+#echo 14400 >	/proc/sys/net/ipv4/route/secret_interval #600
+#echo 16384 >	/proc/sys/net/ipv4/route/gc_thresh #512
+
+echo 32768 >	/proc/sys/net/ipv4/route/max_size
+
+#echo 512 >	/proc/sys/net/ipv4/neigh/default/gc_thresh1 #128
+#echo 1024 >	/proc/sys/net/ipv4/neigh/default/gc_thresh2 #512
+#echo 2048 >	/proc/sys/net/ipv4/neigh/default/gc_thresh3 #1024
+#echo 96 > 	/proc/sys/net/ipv4/neigh/default/proxy_qlen #64
+#echo 6 >	/proc/sys/net/ipv4/neigh/default/unres_qlen #3
+
+echo 4096 87380 262144 >	/proc/sys/net/ipv4/tcp_rmem #Receive Window vector 4096 87380 174760
+echo 4096 87380 262144 >	/proc/sys/net/ipv4/tcp_wmem #Send Window vector 4096 16384 131072
+echo 262144 262144 262144 >	/proc/sys/net/ipv4/tcp_mem #TCP stack memory vector 49152 65536 98304
+
 # disable logging of bogus responses to broadcast frames
 echo 1 >	/proc/sys/net/ipv4/icmp_ignore_bogus_error_responses
 # ignore all ICMP ECHO and TIMESTAMP requests sent to it via broadcast/multicast
 echo 1 >	/proc/sys/net/ipv4/icmp_echo_ignore_broadcasts
-# igonora todas as requisições de ICMP ECHO
-#echo 1 >	/proc/sys/net/ipv4/icmp_ignore_all
 # enable syn cookies (prevent against the common 'syn flood attack')
 echo 1 >	/proc/sys/net/ipv4/tcp_syncookies
+
 echo "32768 61000" > /proc/sys/net/ipv4/ip_local_port_range
-echo "24576 32768 49152" > /proc/sys/net/ipv4/tcp_mem
-# Lower FIN timeout
-echo 15 >	/proc/sys/net/ipv4/tcp_fin_timeout # 60
-# permite determinar o número de segundos que uma conexão precisa estar ociosa antes de o TCP enviar checagens de keep-alive
-#echo 7200 >	/proc/sys/net/ipv4/tcp_keepalive_time
-echo 1800 >	/proc/sys/net/ipv4/tcp_keepalive_time
-# Wait time between isAlive interval probes 15-30
-echo 30 >	/proc/sys/net/ipv4/tcp_keepalive_intvl # 75
-# Number of probes before timing out
-echo 5 >	/proc/sys/net/ipv4/tcp_keepalive_probes # 9
 # increase the SYN backlog queue
-echo 8192 >	/proc/sys/net/ipv4/tcp_max_syn_backlog # 256
-echo 1 >	/proc/sys/net/ipv4/tcp_syn_retries # 5
-# permite ativar o TCP window scaling previsto pela RFC1323
-echo 1 >	/proc/sys/net/ipv4/tcp_rfc1337
-# Enable support for large TCP windows
-echo 1 >	/proc/sys/net/ipv4/tcp_window_scaling
-echo 7 >	/proc/sys/net/ipv4/tcp_default_win_scale
-# Allow reuse/recycling of TIME-WAIT sockets for new connections
-echo 1 >	/proc/sys/net/ipv4/tcp_tw_reuse
-echo 1 >	/proc/sys/net/ipv4/tcp_tw_recycle
-# Enable TCP Selective/Forward Acknowledgements
-echo 1 >	/proc/sys/net/ipv4/tcp_sack
-echo 1 >	/proc/sys/net/ipv4/tcp_fack
-echo 1 >	/proc/sys/net/ipv4/tcp_dsack
-echo 0 >	/proc/sys/net/ipv4/tcp_moderate_rcvbuf
-echo 1 >	/proc/sys/net/ipv4/ip_no_pmtu_disc
-# Esse parâmetro determina o número de pacotes SYN+ACK enviados antes de o kernel liberar a conexão.
-echo 2 >	/proc/sys/net/ipv4/tcp_synack_retries # 5
-echo 3 >	/proc/sys/net/ipv4/tcp_retries1 # 3
-# Kill timestamps. These have been the subject of a recent bugtraq thread
-echo 0 >	/proc/sys/net/ipv4/tcp_timestamps
-# Evita problema de resposta tamanho zero
-echo 0 >	/proc/sys/net/ipv4/tcp_ecn
+echo 8192 >	/proc/sys/net/ipv4/tcp_max_syn_backlog #256
+# socket buckets
+echo 131072 > /proc/sys/net/ipv4/tcp_max_tw_buckets
 # Tempo em segundos para manter um fragmento IP na memória.
-echo 15 >	/proc/sys/net/ipv4/ipfrag_time # 30
-
-echo 4096 >	/proc/sys/net/core/netdev_max_backlog # 300
-echo 2048 >	/proc/sys/net/core/somaxconn # 128
-echo 20480 >	/proc/sys/net/core/optmem_max # 10240
-
-echo 15 >	/proc/sys/net/ipv4/route/gc_elasticity # 8
-echo 14400 >	/proc/sys/net/ipv4/route/secret_interval # 600
-
-echo 512 >	/proc/sys/net/ipv4/neigh/default/gc_thresh1 # 128
-echo 1024 >	/proc/sys/net/ipv4/neigh/default/gc_thresh2 # 512
-echo 2048 >	/proc/sys/net/ipv4/neigh/default/gc_thresh3 # 1024
-
-echo 96 > 	/proc/sys/net/ipv4/neigh/default/proxy_qlen # 64
-echo 6 >	/proc/sys/net/ipv4/neigh/default/unres_qlen # 3
+echo 15 >	/proc/sys/net/ipv4/ipfrag_time #30
+# Lower FIN timeout
+echo 30 >	/proc/sys/net/ipv4/tcp_fin_timeout #60
+# permite determinar o número de segundos que uma conexão precisa estar ociosa antes de o TCP enviar checagens de keep-alive
+echo 1800 >	/proc/sys/net/ipv4/tcp_keepalive_time #7200
+# Wait time between isAlive interval probes 15-30
+echo 30 >	/proc/sys/net/ipv4/tcp_keepalive_intvl #75
+# Number of probes before timing out
+echo 5 >	/proc/sys/net/ipv4/tcp_keepalive_probes #9
+# Número de pacotes SYN+ACK enviados antes de o kernel liberar a conexão.
+echo 2 >	/proc/sys/net/ipv4/tcp_synack_retries #5
+echo 3 >	/proc/sys/net/ipv4/tcp_syn_retries #5
+# Allow reuse of TIME-WAIT sockets for new connections
+echo 1 >	/proc/sys/net/ipv4/tcp_tw_reuse
+#echo 1 >	/proc/sys/net/ipv4/tcp_rfc1337
+#echo 0 >	/proc/sys/net/ipv4/tcp_timestamps
+#echo 2 >	/proc/sys/net/ipv4/tcp_default_win_scale
+#echo 1 >	/proc/sys/net/ipv4/tcp_moderate_rcvbuf
+# don't cache ssthresh from previous connection
+#echo 1 >	/proc/sys/net/ipv4/tcp_no_metrics_save
 
 for i in /proc/sys/net/ipv4/conf/*; do
 # don't send redirects
@@ -130,10 +144,8 @@ for i in /proc/sys/net/ipv4/conf/*; do
  echo 0 > $i/bootp_relay
  echo 0 > $i/proxy_arp
 # log packets with impossible addresses to kernel log
- echo 0 > $i/log_martians
+ echo 1 > $i/log_martians
  echo 1 > $i/arp_filter
-# do source validation by reversed path (Recommended option for single homed hosts)
- echo 2 > $i/rp_filter
  echo 1 > $i/arp_announce
  echo 1 > $i/arp_ignore
 done
@@ -151,18 +163,24 @@ iptables -t mangle -N l7-filter
 iptables -I FORWARD -j port-filter
 iptables -I FORWARD -j user-filter
 iptables -t mangle -I POSTROUTING -j l7-filter
+# Create new mangle rulesets
+iptables -t mangle -N tos
+iptables -t mangle -I FORWARD -j tos
+iptables -t mangle -I OUTPUT -j tos
+iptables -t mangle -N conlimit
+iptables -t mangle -I FORWARD -j conlimit
 
 # Create the port-forward rulesets
-iptables -N autofw-acl
 iptables -N portfw-acl
+iptables -N autofw-acl
 iptables -N access-acl
-iptables -t nat -N subnets-masks
-iptables -t nat -N nat-masks
-iptables -t nat -N auto-forward
 iptables -t nat -N port-forward
-iptables -t nat -N nat-acl
+iptables -t nat -N auto-forward
 iptables -t nat -N dns-preroute
+iptables -t nat -N nat-acl
 iptables -t nat -N dns-postroute
+iptables -t nat -N nat-masks
+iptables -t nat -N subnets-masks
 
 iptables -I FORWARD -j portfw-acl
 iptables -I FORWARD -j autofw-acl
@@ -220,6 +238,8 @@ if [ $? = "0" ]; then
  LOCAL_UP=UP
  [ ! -z $LOCAL_IPADDR2 ] && cfg_eth $LOCAL_IPADDR2 $LOCAL_NETMASK2 $IF_LOCAL "2nd IP in 1st Local"
  [ ! -z $LOCAL_IPADDR3 ] && cfg_eth $LOCAL_IPADDR3 $LOCAL_NETMASK3 $IF_LOCAL "3rd IP in 1st Local"
+# do source validation by reversed path (Recommended option for single homed hosts)
+ echo 2 > /proc/sys/net/ipv4/conf/$IF_LOCAL/rp_filter
 fi
 
 # Configure the LAN2 network
@@ -227,6 +247,8 @@ if [ ! -z $LOCAL2_IPADDR ]; then
  LOCAL2_UP=DOWN
  cfg_eth $LOCAL2_IPADDR $LOCAL2_NETMASK $IF_LOCAL2 "2nd Local"
  [ $? = 0 ] && LOCAL2_UP=UP
+# do source validation by reversed path (Recommended option for single homed hosts)
+ echo 2 > /proc/sys/net/ipv4/conf/$IF_LOCAL2/rp_filter
 fi
 
 # Configure the LAN3 network
@@ -234,6 +256,8 @@ if [ ! -z $LOCAL3_IPADDR ]; then
  LOCAL3_UP=DOWN
  cfg_eth $LOCAL3_IPADDR $LOCAL3_NETMASK $IF_LOCAL3 "3rd Local"
  [ $? = 0 ] && LOCAL3_UP=UP
+# do source validation by reversed path (Recommended option for single homed hosts)
+ echo 2 > /proc/sys/net/ipv4/conf/$IF_LOCAL3/rp_filter
 fi
 
 # Configure the LAN4 network
@@ -241,6 +265,17 @@ if [ ! -z $LOCAL4_IPADDR ]; then
  LOCAL4_UP=DOWN
  cfg_eth $LOCAL4_IPADDR $LOCAL4_NETMASK $IF_LOCAL4 "4th Local"
  [ $? = 0 ] && LOCAL4_UP=UP
+# do source validation by reversed path (Recommended option for single homed hosts)
+ echo 2 > /proc/sys/net/ipv4/conf/$IF_LOCAL4/rp_filter
+fi
+
+# Configure the WLAN network
+if [ ! -z $WLAN_IPADDR ]; then
+ WLAN_UP=DOWN
+ cfg_eth $WLAN_IPADDR $WLAN_NETMASK $IF_WLAN WLAN
+ [ $? = 0 ] && WLAN_UP=UP
+# do source validation by reversed path (Recommended option for single homed hosts)
+ echo 2 > /proc/sys/net/ipv4/conf/$IF_WLAN/rp_filter
 fi
 
 # Configure the DMZ network
@@ -252,13 +287,6 @@ if [ ! -z $DMZ_IPADDR ]; then
 	[ ! -z $DMZ_IPADDR2 ] && cfg_eth $DMZ_IPADDR2 $DMZ_NETMASK2 $IF_DMZ "2nd IP in DMZ"
 	[ ! -z $DMZ_IPADDR3 ] && cfg_eth $DMZ_IPADDR3 $DMZ_NETMASK3 $IF_DMZ "3rd IP in DMZ"
  fi
-fi
-
-# Configure the WLAN network
-if [ ! -z $WLAN_IPADDR ]; then
- WLAN_UP=DOWN
- cfg_eth $WLAN_IPADDR $WLAN_NETMASK $IF_WLAN WLAN
- [ $? = 0 ] && WLAN_UP=UP
 fi
 
 USEDYNADDR=YES
@@ -300,7 +328,6 @@ case "$INETTYPE" in
 		[ ! -z $IPADDR2 ] && cfg_eth $IPADDR2 $NETMASK2 $IF_INET "2nd IP in Internet"
 		[ ! -z $IPADDR3 ] && cfg_eth $IPADDR3 $NETMASK3 $IF_INET "3rd IP in Internet"
 	fi
-	echo 0 > /proc/sys/net/ipv4/conf/$IF_INET/rp_filter
 	ip route add 0.0.0.0/0 via $GATEWAY
 	if [ $? = 0 ]; then
 		INET_UP=UP
@@ -329,7 +356,7 @@ case "$INETTYPE" in
  ;;
  *)
 	echo "-------------------- !! ERROR !! ---------------------"
-	echo " This copy of SmartRouter  is not properly configured "
+	echo " This copy of system is not properly configured "
 	echo
 	echo " No valid Internet Connection type has been specified "
 	echo "------------------------------------------------------"
@@ -341,7 +368,6 @@ if [ ! -z $INET2_IPADDR ]; then
  INET2_UP=DOWN
  cfg_eth $INET2_IPADDR $INET2_NETMASK $IF_INET2 "2nd Internet"
  [ $? = 0 ] && INET2_UP=UP
-  echo 0 > /proc/sys/net/ipv4/conf/$IF_INET2/rp_filter
 fi
 
 # Configure the INET3 network
@@ -349,7 +375,6 @@ if [ ! -z $INET3_IPADDR ]; then
  INET3_UP=DOWN
  cfg_eth $INET3_IPADDR $INET3_NETMASK $IF_INET3 "3rd Internet"
  [ $? = 0 ] && INET3_UP=UP
-  echo 0 > /proc/sys/net/ipv4/conf/$IF_INET3/rp_filter
 fi
 
 # Configure the INET4 network
@@ -357,7 +382,6 @@ if [ ! -z $INET4_IPADDR ]; then
  INET4_UP=DOWN
  cfg_eth $INET4_IPADDR $INET4_NETMASK $IF_INET4 "4th Internet"
  [ $? = 0 ] && INET4_UP=UP
-  echo 0 > /proc/sys/net/ipv4/conf/$IF_INET4/rp_filter
 fi
 
 # Enable kernel level IP forwarding
@@ -368,7 +392,7 @@ touch /tmp/ready
 if [ "$INETTYPE" != "ETHERNET_STATIC" ]; then
  echo "Giving PPPoE or DHCP a chance to go up"
  sleep 5
- . /tmp/netsubsys.state	# Reload status
+ . /tmp/netsubsys.state # Reload status
 fi
 
 NET_OK=YES

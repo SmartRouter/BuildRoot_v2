@@ -19,8 +19,8 @@ DHCPCDOPTIONS="$DHCPCDOPTIONS -s /etc/dhcpc/dhcpc.updown -p /var/run/udhcpc.pid"
 echo "Setting up DHCP Internet connection..."
 
 # Clear any stale PID files and old interface.info
-rm /var/run/udhcpc.pid 1> /dev/null 2> /dev/null
-rm /etc/dhcpc/$IF_INET.info 1> /dev/null 2> /dev/null
+rm /var/run/udhcpc.pid >/dev/null 2>&1
+rm /etc/dhcpc/$IF_INET.info >/dev/null 2>&1
 
 # Configure the interface
 ip link set $IF_INET up   #Just to check if nic is ok.
@@ -29,7 +29,7 @@ if [ ! $? = 0 ]; then
  echo "The Internet Network Interface Card was not set properly"
  logger "The Internet Network Interface Card was not set properly"
 else
- udhcpc $DHCPCDOPTIONS &
+ udhcpc $DHCPCDOPTIONS >/dev/null 2>&1 &
  if [ ! $? = 0 ]; then
 	INET_UP=DOWN
 	echo "The DHCP client daemon not started properly"

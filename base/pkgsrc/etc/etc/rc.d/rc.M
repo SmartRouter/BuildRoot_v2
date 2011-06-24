@@ -2,12 +2,6 @@
 #
 # Coyote init script
 
-. /tmp/boot.info
-. /etc/coyote/coyote.conf
-# If it's the first boot run the configuration wizard
-#export TERMINFO=/etc/terminfo
-#[ "$MEDIA" != "CDROM" ] && [ "$RUN_WIZARD" = "YES" ] && /usr/sbin/wizard --install
-
 # Start the inet system
 if [ ! -f /etc/coyote/coyote.conf ]; then
 	echo
@@ -57,19 +51,6 @@ if [ ! -r /etc/dropbear/dropbear_rsa_host_key ]; then
  touch /tmp/need.save
 fi
 [ "$NEW_KEYS" = "YES" -a "$READONLY" = "no" ] && /usr/sbin/lrcfg.back ssh_keys
-
-echo "Set the system clock"
-if [ -z "$TZ" ]; then
- TZ="$(cat /etc/timezone)"
- echo "TZ=$TZ" >> /etc/coyote/coyote.conf
-else
- echo "$TZ" > /etc/timezone
-fi
-cp /etc/timezone /etc/TZ
-export TZ
-
-# Set the clock using bios
-[ -x /sbin/hwclock ] && /sbin/hwclock -s -l
 
 # System loggers
 SYSLOG_OPTS="-m 0 -C "

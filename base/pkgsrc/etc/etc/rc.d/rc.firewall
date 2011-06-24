@@ -8,8 +8,6 @@
 
 DEBUG=0
 
-PATH=$PATH:/usr/sbin
-
 # Load Coyote variables
 [ -z "$CONFIG_LOADED" ] && . /etc/coyote/coyote.conf
 [ -e /tmp/netsubsys.state ] && . /tmp/netsubsys.state
@@ -37,10 +35,14 @@ iptables -A FORWARD -m state --state NEW -j if-filter  2>/dev/null
 # Build Log and Drop chain
 iptables -F log-and-drop
 [ "$LOG_ATTEMPTS" = "YES" ] && iptables -A log-and-drop -j LOG --log-prefix "BLOCKED CONNECTION:"
+iptables -A log-and-drop -p tcp -j REJECT --reject-with tcp-reset
+iptables -A log-and-drop -p udp -j REJECT --reject-with icmp-port-unreachable
 iptables -A log-and-drop -j DROP
 
 # Build Interface Filtering Chain
 iptables -F if-filter
+iptables -A if-filter -p tcp ! --syn -j DROP
+iptables -A if-filter -p tcp --tcp-flags SYN,ACK SYN,ACK -j REJECT --reject-with tcp-reset
 iptables -A if-filter -i $IF_INET -j log-and-drop
 [ -n "$INET2_IPADDR" ] && iptables -A if-filter -i $IF_INET2 -j log-and-drop
 [ -n "$INET3_IPADDR" ] && iptables -A if-filter -i $IF_INET3 -j log-and-drop
@@ -60,6 +62,8 @@ iptables -t nat -F nat-acl
 iptables -F user-filter
 iptables -F port-filter
 iptables -t mangle -F l7-filter
+iptables -t mangle -F tos
+iptables -t mangle -F conlimit
 
 # Pre firewall rules
 if [ -r /etc/coyote/firewall.pre ]; then
@@ -464,16 +468,14 @@ block_protocol() {
 }
 
 #Set permission to access dhcp server when policy is block all users
-
-if [ "$DEFAULT_USERS_FILTER" = "BLOCK_ALL" -a "$DHCPSERVER" = "YES" ] ; then
+if [ "$DEFAULT_USERS_FILTER" = "BLOCK_ALL" -a "$DHCPSERVER" = "YES" ]; then
  COMMAND="iptables -I user-filter -p udp --dport 67:68 --sport 67:68 -j RETURN"
  $COMMAND
  [ $DEBUG = 1 ] && logger "$COMMAND"
 fi
 
 #Set permission to access DNS server when policy is block all users
-
-if [ "$DEFAULT_USERS_FILTER" = "BLOCK_ALL" -a "$USE_DNS_CACHE" = "YES" ] ; then
+if [ "$DEFAULT_USERS_FILTER" = "BLOCK_ALL" -a "$USE_DNS_CACHE" = "YES" ]; then
  COMMAND="iptables -I user-filter -p udp --dport 53 -j RETURN"
  $COMMAND
  [ $DEBUG = 1 ] && logger "$COMMAND"
@@ -515,8 +517,7 @@ if [ -r /etc/coyote/firewall ]; then
 fi
 
 blk_lan() {
- COMMAND="iptables -A $1 -i $2 -j DROP"
-# COMMAND="iptables -A $1 -i $2 -j REJECT"
+ COMMAND="iptables -A $1 -i $2 -j log-and-drop"
  $COMMAND
  [ $DEBUG = 1 ] && logger "$COMMAND"
 }

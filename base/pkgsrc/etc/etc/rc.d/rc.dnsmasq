@@ -125,7 +125,7 @@ if [ "$DHCPSERVER" = "YES" -o "$USE_DNS_CACHE" = "YES" ]; then
  echo "bogus-priv" >> $CONF_FILE1
  echo "expand-hosts" >> $CONF_FILE1
  echo "filterwin2k" >> $CONF_FILE1
- echo "cache-size=$DNS_CACHE" >> $CONF_FILE1
+ [ "$DNS_CACHE" = "0" ] || echo "cache-size=$DNS_CACHE" >> $CONF_FILE1
  echo "local-ttl=$DNS_TTL" >> $CONF_FILE1
  echo "dns-forward-max=$((DHCPD_LMAX * 2))" >> $CONF_FILE1
  if ! [ -z "$DHCPD_DOMAIN" ]; then
@@ -182,5 +182,6 @@ fi
 
 if [ "$USE_DNS_CACHE" = "YES" -o "$DHCPSERVER" = "YES" ]; then
  echo "Starting DNS and DHCP server"
-/usr/sbin/dnsmasq --log-async
+ [ "$DNS_CACHE" = "0" ] && /usr/sbin/dnsmasq --no-ping --log-async --strict-order -p 0 \
+ || /usr/sbin/dnsmasq --no-ping --log-async --strict-order
 fi

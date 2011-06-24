@@ -2,19 +2,11 @@
 #
 # rc.sysinit - unpacks additional archives and starts system
 # scripts
-#
+
 /bin/mount -t proc /proc /proc
 
 # Have busybox create the symbolic links
 /bin/busybox --install -s
-
-sleep 1
-rm /sbin/poweroff
-rm /sbin/reboot
-cp /bin/poweroff.tpl /bin/poweroff
-cp /bin/reboot.tpl /bin/reboot
-ln -s /bin/poweroff /sbin/poweroff
-ln -s /bin/reboot /sbin/reboot
 
 mkdir /dev/inet
 mkdir /tmp
@@ -280,8 +272,8 @@ done
 
 ls $MNT/config/profiles/*.prf > /dev/null 2> /dev/null
 if [ $? = 0 ] ; then
-  [ ! -e /etc/coyote/profiles ] && mkdir /etc/coyote/profiles > /dev/null 2> /dev/null
-  cp $MNT/config/profiles/*.prf /etc/coyote/profiles
+ [ ! -e /etc/coyote/profiles ] && mkdir /etc/coyote/profiles > /dev/null 2> /dev/null
+ cp $MNT/config/profiles/*.prf /etc/coyote/profiles
 fi
 
 . /var/lib/lrpkg/root.dev.own
@@ -289,29 +281,36 @@ fi
 
 umount $MNT
 
-# New Mount Partition by Washington Rodrigues 2008 #
-
 . /etc/coyote/coyote.conf
-if [ "$MEDIA" != "CDROM" ]; then
 
-   if [ -z "$PARTITION" ]; then
-      IDHD=`echo $(($(echo $DEVICE | sed s/[^0123456789]//g)+1))`
-      PART2=`echo $DEVICE | sed s/[0123456789]//g`"$IDHD"
-   else
-      PART2=`echo "$PARTITION"`
-   fi
-   mount -o ro $PART2 $MNT 2>/dev/null
-   if [ "$?" = 0 ]; then
-      FSF=`mount | grep -i "$MNT" | cut -f5 -d" "`
-      echo -e "DEVICE=$PART2\012FSTYPE=$FSF" > /tmp/partition.info
-      umount $MNT
-   fi
-   if [ -e "/tmp/partition.info" ]; then
-      /bin/e2fsck -p $PART2
-      [ "$?" != 0 ] && /bin/e2fsck -f -y $PART2
-      mkdir /partition
-      mount -o noatime,nodiratime $PART2 /partition 2>/dev/null
-   fi
+echo "Set the system clock"
+if [ -z "$TZ" ]; then
+ TZ="$(cat /etc/timezone)"
+ echo "TZ=$TZ" >> /etc/coyote/coyote.conf
+else
+ echo "$TZ" > /etc/timezone
+fi
+cp /etc/timezone /etc/TZ
+export TZ
+
+# Set the clock using bios
+[ -x /sbin/hwclock ] && /sbin/hwclock -s -l
+
+if [ "$MEDIA" != "CDROM" ]; then
+ if [ -z "$PARTITION" ]; then
+	IDHD=`echo $(($(echo $DEVICE | sed s/[^0123456789]//g)+1))`
+	PART2=`echo $DEVICE | sed s/[0123456789]//g`"$IDHD"
+ else
+	PART2=`echo "$PARTITION"`
+ fi
+ mount -o ro $PART2 $MNT 2>/dev/null && \
+ { echo -e "DEVICE=$PART2\012FSTYPE="`mount | grep -i "$MNT" | cut -f5 -d" "`"" > /tmp/partition.info; \
+ umount $MNT; }
+ if [ -e "/tmp/partition.info" ]; then
+	/bin/e2fsck -p $PART2 || /bin/e2fsck -f -y $PART2
+	mkdir /partition
+	mount -t ext2 -o noatime,nodiratime $PART2 /partition 2>/dev/null
+ fi
 fi
 
-. /etc/rc.d/rc.S
+/etc/rc.d/rc.S

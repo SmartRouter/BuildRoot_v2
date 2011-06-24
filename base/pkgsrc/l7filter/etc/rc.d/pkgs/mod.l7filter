@@ -1,3 +1,0 @@
-echo
-echo Loading L7-Filter modules...
-insmod /lib/modules/ipt_layer7.o

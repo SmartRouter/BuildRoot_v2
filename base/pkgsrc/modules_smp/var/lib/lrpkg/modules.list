@@ -1,0 +1,5 @@
+etc/modules
+etc/rc.d/rc.modules
+bin/vconfig
+lib/modules
+var/lib/lrpkg/modules.*
