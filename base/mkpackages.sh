@@ -107,7 +107,7 @@ buildall() {
 
   cd pkgsrc
 #  buildpkg advroute
-  buildpkg bridge
+#  buildpkg bridge
 #  buildpkg dhcpd
   buildpkg etc
   buildpkg iwtools
@@ -123,7 +123,7 @@ buildall() {
   buildpkg language
   buildpkg ssh_keys
   buildpkg acpid
-  buildpkg rrdtool
+#  buildpkg rrdtool
   cd ..
 
   rm -rf packages

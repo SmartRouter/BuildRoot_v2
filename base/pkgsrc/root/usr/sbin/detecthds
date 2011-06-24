@@ -20,5 +20,5 @@ case $DEVICE in
           INFOHD="true"          
          ;;
 esac             
-[ "$INFOHD" = "true" ] && echo "$TYPE#$DEVICE#$MODEL#"`echo $(cat /proc/partitions | grep "$DEVICE\>" | awk -F" " '{ print (int($3/1024)) }')``echo $(sfdisk -g /dev/$DEVICE | awk -F" " '{ print $2,$4,$6 }' | sed 's/\ */#/g')`
+[ "$INFOHD" = "true" ] && echo "$TYPE#$DEVICE#$MODEL#"`echo $(cat /proc/partitions | grep "$DEVICE\>" | awk -F" " '{ print (int($3/1024)) }')`#`echo $(sfdisk -g /dev/$DEVICE | awk -F" " '{ print $2,$4,$6 }' | sed 's/[ ]\ */#/g')`
 done

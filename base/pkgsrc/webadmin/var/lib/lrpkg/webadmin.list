@@ -1,6 +1,5 @@
 /var/lib/lrpkg/webadmin.*
 /etc/rc.d/pkgs/rc.webadmin
-/etc/rc.d/pkgs/rc.createWebadminDataBase
 /etc/lighttpd.tpl
 /var/http/header.inc
 /var/http/style.css
@@ -8,7 +7,6 @@
 /var/http/htdocs/brasao.png
 /var/http/htdocs/logo.png
 /var/http/htdocs/index.htm
-/var/http/htdocs/cgi-bin/graph/cpu/rrd/updateDataBase
 /var/http/htdocs/cgi-bin/qosclasses.cgi
 /var/http/htdocs/cgi-bin/inetconf.cgi
 /var/http/htdocs/cgi-bin/hangup-ppp.cgi

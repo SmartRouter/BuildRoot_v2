@@ -32,3 +32,4 @@ UseLogin no
 # DenyHosts lowsecurity.theirs.com *.evil.org evil.org
 # Umask 022
 # SilentDeny on
+Subsystem sftp /usr/sbin/sftp-server

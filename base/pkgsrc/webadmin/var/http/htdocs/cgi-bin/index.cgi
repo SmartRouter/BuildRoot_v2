@@ -8,23 +8,23 @@ if [ -f /etc/dhcpc/$IF_INET.info ] ; then
 fi
 
 #Environment variables
-VEL=`grep MHz /proc/cpuinfo | cut -f 2 -d ':' | uniq ; echo "GHz"`
 VERSION=`cat /var/lib/lrpkg/root.version`
-KERNEL=`uname -r`
-MACHINE=$(grep "model name" /proc/cpuinfo | cut -f 2 -d ':' | uniq ; grep MHz /proc/cpuinfo | cut -f 2 -d ':' | uniq ; echo "MHz" ; echo "(`grep -ci "model name" /proc/cpuinfo` x)")
+[ `uname -rv | awk '{print $3}'` = "SMP" ] && KERNEL=`uname -rv | awk '{print $1 "-" $3}'` || KERNEL=`uname -r`
 HOST=`hostname`
 NOW=`date`
 UPTIME=`uptime | cut -b 14-100 | cut -f 1 -d ','`
+
 LOAD=`cat /proc/loadavg`
 LAST1=`echo $LOAD | cut -f 1 -d ' '`
 LAST5=`echo $LOAD | cut -f 2 -d ' '`
 LAST15=`echo $LOAD | cut -f 3 -d ' '`
-MEMTOTAL=`free | grep Mem | sed s/\ */#/g | cut -f 3 -d '#'`
-MEMUSED=`free | grep Mem | sed s/\ */#/g | cut -f 4 -d '#'`
-MEMFREE=`free | grep Mem | sed s/\ */#/g | cut -f 5 -d '#'`
+MEMTOTAL=`free | grep Mem | awk '{print $2}'`
+MEMUSED=`free | grep Mem | awk '{print $3}'`
+MEMFREE=`free | grep Mem | awk '{print $4}'`
 PERCUSED=$((MEMUSED*100/MEMTOTAL))
 PERCFREE=$((100-$PERCUSED))
-#SECOND PART
+
+#STATUS NETWORK AND MORE
 if [ "$INETTYPE" = "ETHERNET_DHCP" ] ; then
  [ -e "/etc/dhcpc/$IF_INET.info" ] && . /etc/dhcpc/$IF_INET.info
 fi
@@ -47,12 +47,21 @@ WEBADMSTATUS=$Abj
 [ "$INETTYPE" = "PPPOE" ] && INTERNET_TYPE="$Abq"
 [ "$INETTYPE" = "ETHERNET_STATIC" ] && INTERNET_TYPE="$Abr"
 [ "$INETTYPE" = "ETHERNET_DHCP" ] && INTERNET_TYPE="$Abs"
-[ "$LOCAL_UP" = "UP" ] && LLOCAL_UP=$Abm
-[ "$LOCAL_UP" = "DOWN" ] && LLOCAL_UP=$Abn
-[ "$LOCAL_UP" = "READY" ] && LLOCAL_UP=$Abo
 [ "$INET_UP" = "UP" ] && LINET_UP=$Abm
 [ "$INET_UP" = "DOWN" ] && LINET_UP=$Abn
 [ "$INET_UP" = "READY" ] && LINET_UP=$Abo
+[ "$INET2_UP" = "UP" ] && LINET2_UP=$Abm
+[ "$INET2_UP" = "DOWN" ] && LINET2_UP=$Abn
+[ "$INET2_UP" = "READY" ] && LINET2_UP=$Abo
+[ "$INET3_UP" = "UP" ] && LINET3_UP=$Abm
+[ "$INET3_UP" = "DOWN" ] && LINET3_UP=$Abn
+[ "$INET3_UP" = "READY" ] && LINET3_UP=$Abo
+[ "$INET4_UP" = "UP" ] && LINET4_UP=$Abm
+[ "$INET4_UP" = "DOWN" ] && LINET4_UP=$Abn
+[ "$INET4_UP" = "READY" ] && LINET4_UP=$Abo
+[ "$LOCAL_UP" = "UP" ] && LLOCAL_UP=$Abm
+[ "$LOCAL_UP" = "DOWN" ] && LLOCAL_UP=$Abn
+[ "$LOCAL_UP" = "READY" ] && LLOCAL_UP=$Abo
 [ "$DMZ_UP" = "UP" ] && LDMZ_UP=$Abm
 [ "$DMZ_UP" = "DOWN" ] && LDMZ_UP=$Abn
 [ "$DMZ_UP" = "READY" ] && LDMZ_UP=$Abo
@@ -93,21 +102,37 @@ color() {
      echo "#$COLOR"
 }
 
-create_cpu_graph() {
- /bin/rrdtool graph /var/http/htdocs/cgi-bin/graph/cpu/cpu.png -a PNG -t "$(cpu_info)" \
- -v "$Ala / $Amu %" -s -24hours -r -w 593 -h 180 --alt-autoscale-max -l 0 -u 100 -r \
- DEF:memory=/tmp/cpu.rrd:memory:AVERAGE \
- DEF:used=/tmp/cpu.rrd:use:AVERAGE \
- $(for x in $(seq 1 $(cat /proc/stat | grep "cpu[0-9]" | wc -l));do echo "DEF:cpu$x=/tmp/cpu.rrd:cpu$x:AVERAGE "; done) \
- CDEF:memo=memory \
- CDEF:mem_mb=used \
- $(for x in $(seq 1 $CPUCOUNT);do echo "CDEF:cpuvar$x=cpu$x "; done) \
- AREA:memo#D9D900:"$Amu" \
- GPRINT:mem_mb:MIN:"Min\: %8.2lf mb" \
- GPRINT:mem_mb:AVERAGE:"Average\: %8.2lf mb" \
- GPRINT:mem_mb:MAX:"Max\: %8.2lf mb" \
- GPRINT:mem_mb:LAST:"Current\: %8.2lf mb\n" \
- $(for x in $(seq 1 $(cat /proc/stat | grep "cpu[0-9]" | wc -l));do echo "LINE1:cpu$x$(color $x):cpu$x\n ";done) >/dev/null 2>&1 
+header_table() {
+ echo "   <tr>"
+ for argnum in $(seq 1 $#); do
+	eval $(echo "vargs=\$$argnum")
+	header_name="$(echo "$vargs" | cut -f1 -d",")"
+	echo "      <td class=\"header\">$header_name</td>"
+ done
+echo "   </tr>"
+}
+
+get_color() {
+ case "$1" in
+	"$Abm")	echo "Green";;
+	"$Ptb")	echo "Green";;
+	"$Ptc")	echo "Red";;
+	"$Abn")	echo "Red";;
+	"$Abj")	echo "Green";;
+	"$Abk")	echo "Red";;
+	*)	echo "";;
+ esac
+}
+
+output_line() {
+ [ "$COLOR" = "row8" -o "$COLOR" = "" ] && COLOR="row6" || COLOR="row8"
+ echo "   <tr>"
+ for argnum in $(seq 1 $#); do
+	eval $(echo "items_value=\$$argnum")
+	items_value="$(echo "$items_value")"
+	 echo "      <td class=\"$COLOR\"><span id=`get_color $items_value`>$items_value</span></td>"
+ done
+echo "   </tr>"
 }
 
 list_language(){
@@ -135,36 +160,15 @@ echo "<tr>
 fi
 }
 
-add_info_item_form_2(){
-echo "<tr>
- <td colspan=2 class=row1 align=right><b>$1</b></td>
- <td width=25% class=row2>$2</td>
- <td width=25% class=row2>$3</td>
-</tr>"
-}
-
 PPPIP=`getifaddr ppp0`
 [ "$INETTYPE" = "PPPOE" -o "$INETTYPE" = "PPP" ] && GW=`ifconfig ppp0 | grep P-t-P | cut -f3 -d: | cut -f1 -d" "` \
 || GW=`/usr/sbin/ip route show | grep default | cut -f 3 -d ' '`
 /usr/sbin/ip.test -i > /dev/null 2> /dev/null
 [ $? != 0 ] && IPSTATUS=$Ptc || IPSTATUS=$Ptb
 
-get_color() {
- case "$1" in
-	"$Abm")	echo "Green";;
-	"$Ptb")	echo "Green";;
-	"$Ptc")	echo "Red";;
-	"$Abn")	echo "Red";;
-	"$Abj")	echo "Green";;
-	"$Abk")	echo "Red";;
-	*)		echo "Normal";;
- esac
-}
-
 #INIT MAIN
 
 cl_header2 "SmartRouter - $MWE"
-create_cpu_graph
 
 if [ "$FORM_OKBTN" = "$Fsb" ]; then
  LANGUAGE_WEBADMIN=$FORM_LANGUAGE_WEBADMIN
@@ -175,6 +179,7 @@ fi
 
 init_form
 init_main_table
+
 #GENERAL INFORMATION
  add_title "$Agi" "4"
  add_info_item_form "$Baj" "$(init_combobox \"LANGUAGE_WEBADMIN\") $(list_language) $(end_combobox) $(echo "<input type=submit value=\"$Fsb\" name=OKBTN>")"
@@ -182,92 +187,6 @@ init_main_table
  add_info_item_form "$Ahs" "$HOST"
  add_info_item_form "$Adn" "$DOMAINNAME"
  add_info_item_form "$Pta" "$IPSTATUS" "[ <a href=\"diags.cgi?COMMAND=/usr/sbin/ip.test%20-w\"><u>$Ptd</u></a> ]"
-
-#WAN - FIRST
-add_title "$Ans - $Ani" "4"
-case "$INETTYPE" in
- ETHERNET_STATIC)
- add_info_item_form "$Ast" "$LINET_UP"
- add_info_item_form "$Ait" "$INTERNET_TYPE"
- add_info_item_form "$Aei" "$IPADDR"
- [ -n "$IPADDR2" ] && add_info_item_form "$And $Aei" "$IPADDR2/$NETMASK2"
- [ -n "$IPADDR3" ] && add_info_item_form "$Ard $Aei" "$IPADDR3/$NETMASK3"
- add_info_item_form "$Anm" "$NETMASK"
- add_info_item_form_2 "$Agt" "$GATEWAY" "[ <a href=diags.cgi?COMMAND=/usr/sbin/gateway.test><u>$Abf</u></a> ]"
- ;;
- ETHERNET_DHCP)
- add_info_item_form "$Ast" "$LINET_UP" "[ <a href=diags.cgi?COMMAND=/usr/sbin/dhcp.release><u>$Abh</u></a> | <a href=diags.cgi?COMMAND=/usr/sbin/dhcp.renew><u>$Abi</u></a> ]"
- add_info_item_form "$Ait" "$INTERNET_TYPE"
-  if [ -n "$dhcp_ip" ] ; then
-  add_info_item_form "$Aei" "$dhcp_ip"
-  add_info_item_form "$Anm" "$NETMASK"
-  add_info_item_form_2 "$Agt" "$dhcp_router" "[ <a href=diags.cgi?COMMAND=/usr/sbin/gateway.test><u>$Abf</u></a> ]"
-  fi
- ;;
-  PPP*)
-  add_info_item_form "$Ast" "$LINET_UP" "[ <a href=dial-ppp.cgi><u>$Mdl</u></a> | <a href=hangup-ppp.cgi><u>$Mhg</u></a> ]"
-  add_info_item_form "$Ait" "$INTERNET_TYPE"
-  add_info_item_form "$Aei" "$PPPIP"
- [ -n "$CONNECTTIME" ] && add_info_item_form "$Acs" "$CONNECTTIME"
- [ -n "$CONNECTSTRING" ] && add_info_item_form "$Act" "$CONNECTSTRING"
- [ -n "$GW" ] && add_info_item_form_2 "$Agt" "$GW" "[ <a href=diags.cgi?COMMAND=/usr/sbin/gateway.test><u>$Abf</u></a> ]"
- ;;
-esac
-
-
-#LAN - FIRST
-add_title "$Ans - $Aln" "4"
- add_info_item_form "$Ast" "$LLOCAL_UP" "<a></a>"
- add_info_item_form "$Ali" "$LOCAL_IPADDR"
- add_info_item_form "$Anm" "$LOCAL_NETMASK"
-[ -n "$LOCAL_IPADDR2" ] && add_info_item_form "$And $Ali" "$LOCAL_IPADDR2 / $LOCAL_NETMASK2"
-[ -n "$LOCAL_IPADDR3" ] && add_info_item_form "$Ard $Ali" "$LOCAL_IPADDR3 / $LOCAL_NETMASK3"
-
-#SECOND LAN
-if [ -n "$LOCAL2_UP" ] ; then
-add_title "$Ans - $Pua" "4"
- add_info_item_form "$Ast" "$LLOCAL2_UP" "<a></a>"
- add_info_item_form "LAN2 $Aip" "$LOCAL2_IPADDR"
- add_info_item_form "$Anm" "$LOCAL2_NETMASK"
-fi
-#THIRD LAN
-if [ -n "$LOCAL3_UP" ] ; then
-add_title "$Ans - $Pub" "4"
- add_info_item_form "$Ast" "$LLOCAL3_UP" "<a></a>"
- add_info_item_form "LAN3 $Aip" "$LOCAL3_IPADDR"
- add_info_item_form "$Anm" "$LOCAL3_NETMASK"
-fi
-#FOURTH LAN
-if [ -n "$LOCAL4_UP" ] ; then
-add_title "$Ans - $Puc" "4"
- add_info_item_form "$Ast" "$LLOCAL4_UP" "<a></a>"
- add_info_item_form "LAN4 $Aip" "$LOCAL4_IPADDR"
- add_info_item_form "$Anm" "$LOCAL4_NETMASK"
-fi
-
-#WLAN
-if [ -n "$WLAN_UP" ] ; then
-add_title "$Ans - $Pud" "4"
- add_info_item_form "$Ast" "$LWLAN_UP" "<a></a>"
- add_info_item_form "WLAN $Aip" "$WLAN_IPADDR"
- add_info_item_form "$Anm" "$WLAN_NETMASK"
-fi
- 
-#DMZ
-if [ -n "$DMZ_UP" ] ; then
-add_title "$Ans - $Adz" "4"
- add_info_item_form "$Ast" "$LDMZ_UP" "<a></a>"
- add_info_item_form "DMZ $Aip" "$DMZ_IPADDR"
- add_info_item_form "$Anm" "$DMZ_NETMASK"
- [ -n "$DMZ_IPADDR2" ] && add_info_item_form "$And DMZ $Aip" "$DMZ_IPADDR2 / $DMZ_NETMASK2"
- [ -n "$DMZ_IPADDR3" ] && add_info_item_form "$Ard DMZ $Aip" "$DMZ_IPADDR3 / $DMZ_NETMASK3"
-fi
- 
-#DNS
-add_title "$Adi" "4"
-[ -e "/tmp/realdns1" ] && add_info_item_form_2 "$Apn" "`cat /tmp/realdns1`" "[ <a href=diags.cgi?COMMAND=/usr/sbin/dns.test><u>$Abg</u></a> ]"
-[ -e "/tmp/realdns2" ] && add_info_item_form "$Asn" "`cat /tmp/realdns2`"
-[ -e "/tmp/realdns3" ] && add_info_item_form "$Atn" "`cat /tmp/realdns3`"
 
  #SYSTEM INFORMATION
 add_title "$Asv" "4"
@@ -282,6 +201,7 @@ add_title "$Asi" "4"
  add_info_item_form "$Akv" "$KERNEL"
  add_info_item_form "$Adt" "$NOW"
  add_info_item_form "$Aup" "$UPTIME"
+ add_info_item_form "CPU" "$(cpu_info)"
  echo "<tr>
  <td rowspan=3 width=35% class=row1 align=right><b>$Ala</b></td>
  <td class=row1 align=right><b>$Abb</b></td>
@@ -295,20 +215,85 @@ add_title "$Asi" "4"
  <td class=row1 align=right><b>$Als 15 $Amn</b></td>
  <td colspan=2 class=row2>$LAST15</td>
 </tr>"
-#echo "<tr>
-# <td rowspan=3 class=row1 align=right><b>$Amu</b></td>
-# <td class=row1 align=right><b>$Abd</b></td>
-# <td colspan=2 class=row2>$MEMTOTAL kb (100%)</td>
-#</tr>
-#<tr>
-# <td class=row1 align=right><b>$Aus</b></td>
-# <td colspan=2 class=row2>$MEMUSED kb ($PERCUSED%)</td>
-#</tr>
-#<tr>
-# <td class=row1 align=right><b>$Afr</b></td>
-# <td colspan=2 class=row2>$MEMFREE kb ($PERCFREE%)</td>
-#</tr>"
-[ -e "graph/cpu/cpu.png" ] && echo "<tr><td width=\"100%\" colspan=4><div align=\"center\"><img src=\"/cgi-bin/graph/cpu/cpu.png\"></div></td></tr>"
+echo "<tr>
+ <td rowspan=3 class=row1 align=right><b>$Amu</b></td>
+ <td class=row1 align=right><b>$Abd</b></td>
+ <td colspan=2 class=row2>$MEMTOTAL kb (100%)</td>
+</tr>
+<tr>
+ <td class=row1 align=right><b>$Aus</b></td>
+ <td colspan=2 class=row2>$MEMUSED kb ($PERCUSED%)</td>
+</tr>
+<tr>
+ <td class=row1 align=right><b>$Afr</b></td>
+ <td colspan=2 class=row2>$MEMFREE kb ($PERCFREE%)</td>
+</tr>"
+
+#WAN
+case "$INETTYPE" in
+ ETHERNET_STATIC)
+  init_main_table
+  add_title "$Ani" "5"
+  header_table "Interface" "Nome" "Descrição" "$Ast" "$Aei" "GATEWAY"
+  output_line "$IF_INET" "<b>WAN1</b>" "$Aei" "$LINET_UP" "$IPADDR / $NETMASK" "$GATEWAY [ <a href=diags.cgi?COMMAND=/usr/sbin/gateway.test><u>$Abf</u></a> ]"
+ ;;
+ ETHERNET_DHCP)
+  init_main_table
+  add_title "$Ani" "5"
+  header_table "Interface" "Nome" "Descrição" "$Ast" "$Aei" "GATEWAY"
+  output_line "$IF_INET" "$INTERNET_TYPE <b>WAN1</b>" "$LINET_UP" " $dhcp_ip / $dhcp_mask  [ <a href=diags.cgi?COMMAND=/usr/sbin/dhcp.release><u>$Abh</u></a> | <a href=diags.cgi?COMMAND=/usr/sbin/dhcp.renew><u>$Abi</u></a> ]" "$dhcp_router [ <a href=diags.cgi?COMMAND=/usr/sbin/gateway.test><u>$Abf</u></a> ]"
+ ;;
+ PPP*)
+  init_main_table
+  add_title "PPPoE" "6"
+  header_table "Interface" "Nome" "Descrição" "$Ast" "$Aei" "GATEWAY" "$Acs" "$Act"
+  output_line "$IF_INET" "<b>WAN1</b>" "$INTERNET_TYPE" "$LINET_UP" "$PPPIP [ <a href=dial-ppp.cgi><u>$Mdl</u></a> | <a href=hangup-ppp.cgi><u>$Mhg</u></a> ]" "$GW [ <a href=diags.cgi?COMMAND=/usr/sbin/gateway.test><u>$Abf</u></a> ]" "$CONNECTTIME" "$CONNECTSTRING"
+  end_table
+  echo "<br>"
+  init_main_table
+  add_title "$Ani" "5"
+  header_table "Interface" "Nome" "Descrição" "$Ast" "$Aei" "GATEWAY"
+ ;;
+esac
+ [ -n "$IPADDR2" ] && output_line "$IF_INET" "<b>WAN1</b>" "$And $Aei" "$LINET_UP" "$IPADDR2 / $NETMASK2" ""
+ [ -n "$IPADDR3" ] && output_line "$IF_INET" "<b>WAN1</b>" "$Ard $Aei" "$LINET_UP" "$IPADDR3 / $NETMASK3" ""
+ [ -n "$LINET2_UP" ] && output_line "$IF_INET2" "<b>WAN2</b>" "$Pua" "$LINET2_UP" "$INET2_IPADDR / $INET2_NETMASK" "$INET2_GATEWAY"
+ [ -n "$LINET3_UP" ] && output_line "$IF_INET3" "<b>WAN3</b>" "$Pub" "$LINET3_UP" "$INET3_IPADDR / $INET3_NETMASK" "$INET3_GATEWAY"
+ [ -n "$LINET4_UP" ] && output_line "$IF_INET4" "<b>WAN4</b>" "$Puc" "$LINET4_UP" "$INET4_IPADDR / $INET4_NETMASK" "$INET4_GATEWAY"
+end_table
+#DNS
+if [ -e "/tmp/realdns1" ]; then
+init_main_table
+ add_title "$Adi - [ <a href=diags.cgi?COMMAND=/usr/sbin/dns.test><u>$Abg</u></a> ]" "4"
+ header_table "$Apn" "$Asn" "$Atn"
+ output_line "`cat /tmp/realdns1`" "`cat /tmp/realdns2`" "`cat /tmp/realdns3`"
+end_table
+fi
+echo "<br>"
+
+#LAN
+init_main_table
+ add_title "$Aln" "5"
+ header_table "Interface" "Nome" "Descrição" "$Ast" "$Ali" 
+ output_line "$IF_LOCAL" "<b>LAN1</b>" "$Ali" "$LLOCAL_UP" "$LOCAL_IPADDR / $LOCAL_NETMASK"
+ [ -n "$LOCAL_IPADDR2" ] && output_line "$IF_LOCAL" "<b>LAN1</b>" "$And $Ali" "$LLOCAL_UP" "$LOCAL_IPADDR2 / $LOCAL_NETMASK2"
+ [ -n "$LOCAL_IPADDR3" ] && output_line "$IF_LOCAL" "<b>LAN1</b>" "$Ard $Ali" "$LLOCAL_UP" "$LOCAL_IPADDR3 / $LOCAL_NETMASK3"
+ [ -n "$LOCAL2_UP" ] && output_line "$IF_LOCAL2" "<b>LAN2</b>" "$Pua" "$LLOCAL2_UP" "$LOCAL2_IPADDR / $LOCAL2_NETMASK"
+ [ -n "$LOCAL3_UP" ] && output_line "$IF_LOCAL3" "<b>LAN3</b>" "$Pub" "$LLOCAL3_UP" "$LOCAL3_IPADDR / $LOCAL3_NETMASK"
+ [ -n "$LOCAL4_UP" ] && output_line "$IF_LOCAL4" "<b>LAN4</b>" "$Puc" "$LLOCAL4_UP" "$LOCAL4_IPADDR / $LOCAL4_NETMASK"
+ [ -n "$WLAN_UP" ] && output_line "$IF_WLAN" "<b>WLAN</b>" "$Pud" "$LWLAN_UP" "$WLAN_IPADDR / $WLAN_NETMASK"
+end_table
+
+#DMZ
+if [ -n "$DMZ_UP" ]; then
+init_main_table
+ add_title "$Adz" "4"
+ header_table "Interface" "Nome" "$Ast" "$Ali" 
+ output_line "$IF_DMZ" "<b>DMZ</b>" "$LDMZ_UP" "$DMZ_IPADDR / $DMZ_NETMASK"
+ [ -n "$DMZ_IPADDR2" ] && output_line "$IF_DMZ" "<b>DMZ</b>" "$LDMZ_UP" "$DMZ_IPADDR2 / $DMZ_NETMASK2"
+ [ -n "$DMZ_IPADDR3" ] && output_line "$IF_DMZ" "<b>DMZ</b>" "$LDMZ_UP" "$DMZ_IPADDR3 / $DMZ_NETMASK3"
+end_table
+fi
 
 end_table
 

@@ -1,5 +1,8 @@
 #!/bin/sh
-#Version 1.2 (26/11/2010) --> naufragoweb
+#Version 2.0 (26/11/2010) --> naufragoweb
+#Cahngelog:
+#Sex 07 Jan 2011 12:32:16 BRST  --> add change disk for second partition (naufragoweb)
+
 
 INSTDIR='/tmp/install'
 SRCDIR_SOURCE="/mnt"
@@ -18,7 +21,7 @@ check_yn() {
 abort() {
    umount $INSTDIR 2&>1 
    rm -rf $INSTDIR
-   umount /mnt 2&>1 
+   umount /mnt 2&>1
    echo
    echo "[0;31mInstalation Aborted. Press [ENTER][0m"
    echo
@@ -154,6 +157,47 @@ showhd() {
    echo
 }
 
+defined_disk() {
+number=0
+detecthds | while read LINE; do
+                        number=$(($number+1))
+                        treatline
+                        showhd
+                  done;
+voltar=1
+while [ "$voltar" = 1 ]; do
+      echo -n "Choose the hard disk you want to install : "
+      read junk
+      numb=0
+      LINE=
+      echo -n > $INSTDIR/line
+      detecthds | while read LINE; do
+                        numb=$((numb+1))
+                        [ "$numb" = "$junk" ] && echo $LINE > $INSTDIR/line
+                        number="$numb"
+                  done;
+      LINE=`cat $INSTDIR/line`
+      [ -n "$LINE" ] && voltar=0
+      treatline
+done;
+echo
+echo "You choose:"
+showhd
+}
+
+disk_default_cache() {
+device_cache="$device"2 
+cyl_first=$((($mbs*1024*1024)/($head*$sect*512)))
+cyl_remaining=$(($cyl-$cyl_first))
+if [ "$(($cyl_remaining*$head*$sect/2048))" -le "5000" ]; then
+   default_mbs_cache=$(($cyl_remaining*$head*$sect/2048))
+   size_cache=$(($cyl_remaining*$head*$sect/2048))
+else
+   default_mbs_cache="5000"
+   size_cache=$(($cyl_remaining*$head*$sect/2048))
+fi
+}
+
 case "$hds" in
    0 )
       echo "There isn't any hard disk installed in this computer"
@@ -169,33 +213,12 @@ case "$hds" in
       showhd
       ;;
    * )
-      number=0
-      detecthds | while read LINE; do
-                        number=$(($number+1))
-                        treatline
-                        showhd
-                  done;
-      voltar=1
-      while [ "$voltar" = 1 ]; do
-            echo -n "Choose the hard disk you want to install the System: "
-            read junk
-            numb=0
-            LINE=
-            echo -n > $INSTDIR/line
-            detecthds | while read LINE; do
-                              numb=$((numb+1))
-                              [ "$numb" = "$junk" ] && echo $LINE > $INSTDIR/line
-                        done;
-            LINE=`cat $INSTDIR/line`
-            [ -n "$LINE" ] && voltar=0
-            treatline
-      done;
-      echo
-      echo "You choose:"
-      showhd
+      echo "[0;34mDefined Disk to install de System[0m"
+      defined_disk
       ;;
 esac
 
+.
 check_yn "Are you sure you want to install the System to this Hard Disk ? (y/n) - "
 [ "$YN" = "N" ] && abort
 
@@ -305,7 +328,7 @@ umount /mnt > /dev/null 2&>1
 
 if [ "$format" = "yes" ]; then
    min_part=$(($head*$sect/2048))
-   echo $iface - $showsize MB
+   echo $iface - $size MB
    echo $model
    sfdisk -g $device
    echo
@@ -341,12 +364,43 @@ if [ "$format" = "yes" ]; then
    [ "$YN" = "Y" ] && use_cache=yes
 
    if [ "$use_cache" = "yes" ]; then
-      cyl_first=$((($mbs*1024*1024)/($head*$sect*512)))
-      cyl_remaining=$(($cyl-$cyl_first))
-      default_mbs_cache=$(($cyl_remaining*$head*$sect/2048))
+      case "$hds" in
+            1 )
+               disk_default_cache
+               ;;
+            * )
+               echo "[0;34mDefined disk for install Second Partition (/partition)[0m"
+               defined_disk
+               device_cache="/dev/$hd"
+               if [ "$device_cache" -eq "$device" ]; then
+                  disk_default_cache
+               else
+                  min_part=$(($head*$sect/2048))
+                  echo "$iface - $size MB"
+                  echo "$model"
+                  sfdisk -g $device_cache
+                  default_mbs_cache="5000"
+                  size_cache="$size"
+               fi
+               echo
+               if [ "$size_cache" -lt "$default_mbs_cache" ]; then
+                  default_mbs_cache="$size_cache"
+               else
+                  echo
+                  echo "[0;31mWARNNING!!![0m"
+                  echo "It is strongly recommended not to exceed the default size for the second"
+                  echo "partition. Sizes larger than recommended may cause serious problems for "
+                  echo "your system. If you want to continue with a larger size, is at your own"
+                  echo "risk."
+               fi   
+               ;;
+      esac        
       while [ "$mbs_cache" = "" ]; do
             echo
-            echo -n "Set the size of partition to create in Megabytes (default=$default_mbs_cache MB) : "
+            echo "default          =$default_mbs_cache MB"
+            echo "maximum allowed  =$size_cache MB"
+            echo
+            echo -n "Set the size of partition to create in Megabytes  : "
             read junk
             [ -z "$junk" ] && mbs_cache=$default_mbs_cache
             [ -n "$junk" ] && mbs_cache=$junk
@@ -357,8 +411,12 @@ if [ "$format" = "yes" ]; then
                  echo "Too little. The smaller partition for this hd is $min_part Megabytes"
                  mbs_cache=
             elif [ "$mbs_cache" -gt $default_mbs_cache ]; then
-                 echo "Too big. The hd has only $default_mbs_cache Megabytes remaining"
-                 mbs_cache=
+                 if [ "$default_mbs_cache" -eq "$(($cyl_remaining*$head*$sect/2048))" ]; then
+                    echo "Too big. The hd has only $default_mbs_cache Megabytes remaining"
+                    mbs_cache=
+                 else
+                    mbs_cache=$junk
+                 fi
             fi
       done;
       echo
@@ -368,7 +426,6 @@ if [ "$format" = "yes" ]; then
       echo
       echo "The filesystem recommended format second partition is ext2 (option recommended)"
       echo
-      defautl_cache_par=
       while [ "$type_cache_par" = "" ]; do
             echo "Options:"
             echo
@@ -414,17 +471,35 @@ if [ "$format" = "yes" ]; then
    cyl=$((($mbs*1024*1024)/($head*$sect*512)))
    command="0,$cyl,b,*"
 
-   [ "$use_cache" = "yes" ] && { cache_par="$device"2; cyl_cache=$((($mbs_cache*1024*1024)/($head*$sect*512))); command="$command\n,$cyl_cache,83,"; }
-   
+   if [ "$use_cache" = "yes" ]; then
+      cache_par="$device_cache"
+      cyl_cache=$((($mbs_cache*1024*1024)/($head*$sect*512))) 
+      if [ "$device_cache" = "$device"2 ]; then
+         command="$command\n,$cyl_cache,83,"
+      else
+         command2="0,$cyl_cache,83,"
+      fi
+   fi
    echo $command
    echo
    echo "[0;33m             ======================================[0m"
    echo "[0;33m              Create partition tables on $device...[0m"
    echo "[0;33m             ======================================[0m"
    echo -e $command | sfdisk -q $device || { echo "Error Partitioning "; abort; }
+   if [ -n "$command2" ]; then
+      echo "Cleaning MBR..."
+      dd if=/bin/clean.mbr of=$device_cache count=1 || { echo "Error Cleaning MBR"; abort; }
+      echo $command2
+      echo
+      echo "[0;33m             ============================================[0m"
+      echo "[0;33m              Create partition tables on $device_cache...[0m"
+      echo "[0;33m             ============================================[0m"
+      echo -e $command2 | sfdisk -q $device_cache || { echo "Error Partitioning "; abort; }
+   fi
+
    echo
    echo "[0;33m         =================================================[0m"
-   echo "[0;33m          Creating FAT32 file system on primary partition[0m "
+   echo "[0;33m          Creating FAT32 file system on primary partition [0m "
    echo "[0;33m         =================================================[0m"
    mkdosfs $boot_par || { echo "Error Creating DOS file system"; abort; }
  
@@ -510,6 +585,20 @@ if [ "$upgrade" = "yes" ]; then
    [ -e $INSTDIR/ssh_keys.tgz ] && cp $INSTDIR/ssh_keys.tgz /mnt
 fi
 sync
+
+check_yn "Mark the boot on syslinux.cfg? - You can find problems (y/n) - "
+if [ "$YN" = "Y" ]; then
+SYSLINUX=`cat /mnt/syslinux.cfg`
+echo "1 sed"
+echo -en $(echo -e "$SYSLINUX" | sed 's/[ ]\ */\\\\012/g') > /tmp/changeboot.tmp
+VARBOOT=`cat /tmp/changeboot.tmp | grep -e "^boot="`
+rm -f /tmp/changeboot.tmp 2>/dev/null
+echo "2 sed"
+[ -n "$VARBOOT" ] && SYSLINUX=`echo -en "$SYSLINUX" | sed 's\~" $VARBOOT"~" boot=$boot_par"~g'` || SYSLINUX=`echo -en "$SYSLINUX boot=$boot_par"`
+echo -en "$SYSLINUX" > /mnt/syslinux.cfg
+fi
+#changeboot -boot $boot_pardisk_default_cache
+[ $device = "/dev/hd*" ] && echo "teste"
 
 umount $INSTDIR 2&>1
 rm -rf $INSTDIR

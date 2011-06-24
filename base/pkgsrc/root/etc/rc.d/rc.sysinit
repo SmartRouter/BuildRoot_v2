@@ -29,7 +29,7 @@ ln -s /tmp /usr/tmp
 chmod 1777 /var/lock
 chmod 1777 /tmp
 
-CMDLINE=`echo -e $(cat /proc/cmdline | awk '{print tolower($0)}' | sed 's/\ */\\\012/g')`
+CMDLINE=`echo -e $(cat /proc/cmdline | awk '{print tolower($0)}' | sed 's/[ ]\ */\\\012/g')`
 BOOT=`echo "$CMDLINE" | grep -i "^boot=" | sed s/boot=//g`
 BOOTDELAY=`echo "$CMDLINE" | grep -i "^bootdelay=" | sed s/bootdelay=//g`;[ -z "$BOOTDELAY" ] && BOOTDELAY=15
 

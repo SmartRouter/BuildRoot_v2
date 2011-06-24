@@ -140,7 +140,7 @@ if [ "$DHCPSERVER" = "YES" -o "$USE_DNS_CACHE" = "YES" ]; then
 	[ "$DHCPD_INAMES" = "YES" ] &&  echo "dhcp-ignore-names" >> $CONF_FILE1
 	[ "$DHCPD_UCLIENT" = "YES" ] && echo "dhcp-ignore=#known
 dhcp-host=*:*:*:*:*:*,ignore
-dhcp-script=/test.sh" >> $CONF_FILE1
+#dhcp-script=/test.sh" >> $CONF_FILE1
 	[ -z "$DHCPD_LEASE" ] && DHCPD_LEASE=7200
 	echo "dhcp-leasefile=/var/state/dhcp/dhcpd.leases" >> $CONF_FILE1
 	echo "dhcp-range=${DHCPD_START_IP},${DHCPD_END_IP},${DHCPD_LEASE}" >> $CONF_FILE1

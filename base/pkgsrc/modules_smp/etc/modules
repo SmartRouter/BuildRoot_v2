@@ -24,7 +24,7 @@ crypto/deflate
 #net/ipv4/netfilter/ipt_ECN
 #net/ipv4/netfilter/ipt_ecn
 #net/ipv4/netfilter/ipt_esp
-#net/ipv4/netfilter/ipt_layer7
+net/ipv4/netfilter/ipt_layer7
 #net/ipv4/netfilter/ipt_MIRROR
 #net/ipv4/netfilter/ipt_owner
 #net/ipv4/netfilter/ipt_recent
@@ -59,7 +59,7 @@ drivers/net/forcedeth
 drivers/net/natsemi
 drivers/net/ne2k-pci
 drivers/net/pcnet32
-#drivers/net/sis190
+drivers/net/sis190
 drivers/net/sis900
 drivers/net/sundance
 drivers/net/tulip/tulip
@@ -67,7 +67,7 @@ drivers/net/typhoon
 drivers/net/via-rhine
 drivers/net/e1000/e1000
 drivers/net/r8169
-#drivers/net/r1000
+drivers/net/r1000
 drivers/net/sk98lin/sk98lin
 drivers/net/velocityget/velocityget
 drivers/net/dl2k

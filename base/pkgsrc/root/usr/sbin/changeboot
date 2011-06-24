@@ -1,121 +1,119 @@
 #!/bin/sh
+# Change boot 1.2 By Washington Rodrigues 2008 
+# Code optimized to SRP by Marcos do Vale 2010
 
-################################################
-# Change boot 1.2 By Washington Rodrigues 2008 #
-################################################
-ARG=`echo "$2" | sed 's/\ *//g'`
+ARG=`echo "$2" | sed 's/[ ]\  *//g'`
 MNT="/var/lib/lrpkg/mnt"
 [ -e "/tmp/boot.info" ] && . /tmp/boot.info
 
 title() {
-  echo
-  echo "Change boot 1.2 "
-  echo "----------------"
-  echo
+ echo
+ echo "Change boot"
+ echo "--------------------------------------------"
+ echo
 }
 
-usage(){
-  title
-  echo "Usage:"
-  echo "changeboot [-boot /dev/xxxx ] or [-boot auto] {-device /dev/xxx}"
-  echo "           [-bootdelay <N> seconds] or [-bootdelay auto] {-device /dev/xxx}"
-  echo "           [-default] {-device /dev/xxx} restore original configuration."
-  echo "           [-info] {-device /dev/xxx} show the actual configuration."
-  echo "           [-showdevice] list all bootable device(s)."
-  echo "           [-repair] {-device /dev/xxx} re-create the config file."
-  echo "           {-device /dev/xxx} override boot.info to force use the other device."
-  echo "           {auto} = original configuration."
-  echo 
-  echo "Example:   changeboot -boot /dev/hda1"
-  echo "           set default boot to hda1"
-  echo
-  exit
+usage() {
+ title
+ echo "Usage:"
+ echo "changeboot [-boot /dev/xxxx ] or [-boot auto] {-device /dev/xxx}"
+ echo "           [-bootdelay <N> seconds] or [-bootdelay auto] {-device /dev/xxx}"
+ echo "           [-default] {-device /dev/xxx} restore original configuration."
+ echo "           [-info] {-device /dev/xxx} show the actual configuration."
+ echo "           [-showdevice] list all bootable device(s)."
+ echo "           [-repair] {-device /dev/xxx} re-create the config file."
+ echo "           {-device /dev/xxx} override boot.info to force use the other device."
+ echo "           {auto} = original configuration."
+ echo 
+ echo "Example:   changeboot -boot /dev/hda1"
+ echo "           set default boot to hda1"
+ echo
+ exit
 }
 
 donesystem() {
-  savesyslinux
-  title
-  echo "Configuration have been modified!"
-  echo "Restart the system to take effect."
-  echo
-  exit
+ savesyslinux
+ title
+ echo "Configuration have been modified!"
+ echo "Restart the system to take effect."
+ echo
+ exit
 }
 
 opensyslinux() {
-   mount -o ro $DEVICE $MNT -t $FSTYPE 2>/dev/null
-   if [ "$?" != 0 ];then
-      title
-      echo "ERROR: Impossible mount device"
-      echo "       check system boot!!!"
-      echo
-      exit
-   fi
-   if [ ! -e "$MNT/syslinux.cfg" ]; then
-      title
-      echo "ERROR: File configuration not found!"
-      echo
-      echo "Use changeboot -repair"
-      echo
-      exit
-   fi
-   SYSLINUX=`cat $MNT/syslinux.cfg`
-   umount $MNT 2>/dev/null
+ mount -o ro $DEVICE $MNT -t $FSTYPE 2>/dev/null
+ if [ "$?" != 0 ]; then
+	title
+	echo "ERROR: Impossible mount device"
+	echo "       check system boot!!!"
+	echo
+	exit
+ fi
+ if [ ! -e "$MNT/syslinux.cfg" ]; then
+	title
+	echo "ERROR: File configuration not found!"
+	echo
+	echo "Use changeboot -repair"
+	echo
+	exit
+ fi
+ SYSLINUX=`cat $MNT/syslinux.cfg`
+ umount $MNT 2>/dev/null
+ echo $SYSLINUX | tr ' ' '\n' > /tmp/changeboot.tmp
+ VARBOOT=`grep -i "^boot=" /tmp/changeboot.tmp`
+ VARDELAY=`grep -i "^bootdelay=" /tmp/changeboot.tmp`
+ rm -f /tmp/changeboot.tmp 2>/dev/null
 }
 
 savesyslinux() {
-   mount -o rw $DEVICE $MNT -t $FSTYPE 2>/dev/null
-   echo -en "$SYSLINUX" > $MNT/syslinux.cfg
-   umount $MNT 2>/dev/null
+ mount -o rw $DEVICE $MNT -t $FSTYPE 2>/dev/null
+ echo -en "$SYSLINUX" > $MNT/syslinux.cfg
+ umount $MNT 2>/dev/null
 }
 
 detectboot() {
-cat /proc/partitions | while read x x LENGHT DEVICE; do
-DETECT=0
-    case $DEVICE in
-         hd??) 
-            TMPDEV=`echo $DEVICE | sed s/[0123456789]//g`
-            if [ "$(cat /proc/ide/$TMPDEV/media)" = "disk" ]; then
-               TYPE="PATA"
-               MODEL=`cat /proc/ide/$TMPDEV/model`
-               DETECT=1 
-            fi;;
-         sd??)
-            INFO=`scsi_info /dev/$DEVICE 2>/dev/null`
-            HOST=`echo $INFO | sed 's/.*HOST=\"//g;s/\".*//g'`
-            MODEL=`echo $INFO | sed 's/.*MODEL=\"//g;s/\".*//g'`
-            ls /proc/scsi/usb*/$HOST 2>/dev/null 1>/dev/null
-            if [ "$?" = 0 ]; then
-               if [ "$(echo $MODEL | grep -c -i "Flash Disk")" = 1 ]; then
-                  TYPE="PENDRIVE"
-               else
-                  TYPE="HDD USB"
-               fi   
-            elif [ "$(echo $MODEL | cut -f1 -d" ")" = "ATA" ]; then
-               TYPE="SATA"
-            else
-               TYPE="SCSI"
-            fi
-            DETECT=1;;
-    esac
-
-if [ "$DETECT" = 1 ]; then
-   INFO=`fdisk -l 2>/dev/null | grep "/dev/$DEVICE" | grep -c -i "\*"`
-   [ "$INFO" = 1 ] && echo "$DEVICE#$TYPE#$MODEL"
-fi
-done     
+ while read major minor blocks name; do
+	DETECT=0
+	case $name in
+	 hd??) 
+		TMPDEV=`echo $name | sed 's/[0123456789]//g'`
+		if [ "$(cat /proc/ide/$TMPDEV/media)" = "disk" ]; then
+		 TYPE="PATA"
+		 MODEL=`cat /proc/ide/$TMPDEV/model`
+		 DETECT=1 
+		fi;;
+	 sd??)
+		INFO=`scsi_info /dev/$name 2>/dev/null`
+		HOST=`echo $INFO | sed 's/.*HOST=\"//g;s/\".*//g'`
+		MODEL=`echo $INFO | sed 's/.*MODEL=\"//g;s/\".*//g'`
+		ls /proc/scsi/usb*/$HOST 2>/dev/null 1>/dev/null
+		if [ "$?" = 0 ]; then
+		 [ "$(echo $MODEL | grep -c -i "Flash Disk")" = 1 ] && TYPE="PENDRIVE" || TYPE="HDD USB"
+		elif [ "$(echo $MODEL | cut -f1 -d" ")" = "ATA" ]; then
+		 TYPE="SATA"
+		else
+		 TYPE="SCSI"
+		fi
+		DETECT=1;;
+	esac
+	if [ "$DETECT" = 1 ]; then
+	 INFO=`fdisk -l 2>/dev/null | grep "/dev/$name" | grep -c -i "\*"`
+	 [ "$INFO" = 1 ] && echo "$name#$TYPE#$MODEL"
+	fi
+ done < /proc/partitions
 }
 
 llign() {
-  lenght=${#1}
-  if [ "$lenght" = "$2" ]; then
-     echo "$1"
-     exit 0
-  fi
-  var=""
-  for POS in $(seq $((lenght+1)) $2); do
-      var=$var"\\040"
-  done
-  echo $1$var
+ lenght=${#1}
+ if [ "$lenght" = "$2" ]; then
+	echo "$1"
+	exit 0
+ fi
+ var=""
+ for POS in $(seq $((lenght+1)) $2); do
+	var=$var"\\040"
+ done
+ echo $1$var
 }
 
 if [ "$3" = "-device" -o "$2" = "-device" ]; then
@@ -143,117 +141,75 @@ if [ "$ISMOUNTED" = 1 ]; then
    echo "ERROR: Please unmount device /mnt to continue!"
    echo
    exit
-fi
-
-if [ "${#2}" -gt 0 ]; then
-   if [ "$1" = "-bootdelay" -a "$ARG" != "auto" ]; then
-      ISNUMERIC=`echo $ARG | sed s/[0123456789]//g`
-      if [ -n "$ISNUMERIC" ]; then
-         title
-         echo "ERROR: Invalid argument, use only numbers!"
-         echo
-         exit
-      fi
-   fi
-fi   
+fi  
 
 case $1 in
-	 "-default")
-                   opensyslinux
-                   echo -en $(echo -e "$SYSLINUX" | sed s/\ */\\\\012/g) > /tmp/changeboot.tmp
-                   VARBOOT=`cat /tmp/changeboot.tmp | grep -i "^boot="`
-                   VARDELAY=`cat /tmp/changeboot.tmp | grep -i "^bootdelay="`
-                   rm -f /tmp/changeboot.tmp 2>/dev/null
-                   [ -n "$VARBOOT" ] && SYSLINUX=`echo -en "$SYSLINUX" | sed s\~" $VARBOOT"~~g`
-                   [ -n "$VARDELAY" ] && SYSLINUX=`echo -en "$SYSLINUX" | sed s\~" $VARDELAY"~~g`
-                   donesystem
-                   ;;
-	    "-boot")
-                   if [ -n "$ARG" ]; then
-                      if [ "$ARG" != "auto" ]; then
-                         opensyslinux
-                         echo -en $(echo -e "$SYSLINUX" | sed s/\ */\\\\012/g) > /tmp/changeboot.tmp
-                         VARBOOT=`cat /tmp/changeboot.tmp | grep -e "^boot="`
-                         rm -f /tmp/changeboot.tmp 2>/dev/null
-                         [ -n "$VARBOOT" ] && SYSLINUX=`echo -en "$SYSLINUX" | sed s\~" $VARBOOT"~" boot=$ARG"~g` || SYSLINUX=`echo -en "$SYSLINUX boot=$ARG"`
-                         donesystem
-                      else
-                         opensyslinux
-                         echo -en $(echo -e "$SYSLINUX" | sed s/\ */\\\\012/g) > /tmp/changeboot.tmp
-                         VARBOOT=`cat /tmp/changeboot.tmp | grep -i "^boot="`
-                         rm -f /tmp/changeboot.tmp 2>/dev/null
-                         [ -n "$VARBOOT" ] && SYSLINUX=`echo -en "$SYSLINUX" | sed s\~" $VARBOOT"~~g`
-                         if [ -n "$ARG" ]; then
-                            donesystem
-                         else
-                            title
-                            echo "ERROR: Invalid Argument!"
-                            echo
-                            exit
-                         fi
-                      fi
-                   fi   
-                   ;;
-       "-bootdelay")
-                   if [ -n "$ARG" ]; then
-                      if [ "$ARG" != "auto" ]; then
-                         opensyslinux
-                         echo -en $(echo -e "$SYSLINUX" | sed s/\ */\\\\012/g) > /tmp/changeboot.tmp
-                         VARDELAY=`cat /tmp/changeboot.tmp | grep -i "^bootdelay="`
-                         rm -f /tmp/changeboot.tmp 2>/dev/null
-                         [ -n "$VARDELAY" ] && SYSLINUX=`echo -en "$SYSLINUX" | sed s\~" $VARDELAY"~" bootdelay=$ARG"~g` || SYSLINUX=`echo -en "$SYSLINUX bootdelay=$ARG"`
-                         donesystem
-                      else
-                         opensyslinux
-                         echo -en $(echo -e "$SYSLINUX" | sed s/\ */\\\\012/g) > /tmp/changeboot.tmp
-                         VARDELAY=`cat /tmp/changeboot.tmp | grep -i "^bootdelay="`
-                         rm -f /tmp/changeboot.tmp 2>/dev/null
-                         [ -n "$VARDELAY" ] && SYSLINUX=`echo -en "$SYSLINUX" | sed s\~" $VARDELAY"~~g`
-                         if [ -n "$ARG" ]; then
-                            donesystem
-                         else
-                            title
-                            echo "ERROR: Invalid Argument!"
-                            echo
-                            exit
-                         fi   
-                      fi
-                   fi
-                   ;;
-            "-info")
-                   opensyslinux
-                   echo -en $(echo -e "$SYSLINUX" | sed s/\ */\\\\012/g) > /tmp/changeboot.tmp
-                   VARBOOT=`cat /tmp/changeboot.tmp | grep -i "^boot=" | sed s/boot=//g`
-                   VARDELAY=`cat /tmp/changeboot.tmp | grep -i "^bootdelay=" | sed s/bootdelay=//g`
-                   rm -f /tmp/changeboot.tmp 2>/dev/null
-                   [ -n "$VARBOOT" ] && VARBOOT="Boot device $VARBOOT (Custom)" || VARBOOT="Boot device $DEVICE $([ "$MEDIA" = "CUSTOM" ] && echo "(Override boot.info)" || echo "(Automatic)")"
-                   [ -n "$VARDELAY" ] && VARDELAY="Boot delay $VARDELAY second(s) (Custom)" || VARDELAY="Boot delay 15 seconds (Default)"
-                   title
-                   echo "Display information:"
-                   echo " + "$VARBOOT
-                   echo " + "$VARDELAY
-                   echo
-                   exit
-                   ;;
-          "-repair")
-                   SYSLINUX=`echo -en "display SRP.dpy\012timeout 0\012default linux\012append  load_ramdisk=1 initrd=root.tgz initrd_dyn=minix ramdisk_size=4096 root=/dev/ram0"`
-                   donesystem
-                   ;;
-      "-showdevice")  
-                   title
-                   echo "  DEVICE     TYPE               MODEL"
-                   echo
-                   detectboot | sort | while read INFORMATION; do
-                                             DEVICE=`echo $INFORMATION | cut -f1 -d"#"`
-                                             TYPE=`echo $INFORMATION | cut -f2 -d"#"`
-                                             MODEL=`echo $INFORMATION | cut -f3 -d"#"`
-                                             echo -e "$(llign /dev/$DEVICE 10) $(llign $TYPE 10) $MODEL"
-                                       done
-                                       echo
-                                       exit;;
+ "-default")
+	opensyslinux
+	[ -n "$VARBOOT" ] && SYSLINUX=`echo -en "$SYSLINUX" | sed s\~" $VARBOOT"~~g`
+	[ -n "$VARDELAY" ] && SYSLINUX=`echo -en "$SYSLINUX" | sed s\~" $VARDELAY"~~g`
+	donesystem
+ ;;
+ "-boot")
+	if [ -n "$ARG" ]; then
+	 if [ "$ARG" != "auto" ]; then
+		opensyslinux
+		[ -n "$VARBOOT" ] && SYSLINUX=`echo -en "$SYSLINUX" | sed s\~" $VARBOOT"~" boot=$ARG"~g` || SYSLINUX=`echo -en "$SYSLINUX boot=$ARG"`
+		donesystem
+	 else
+		opensyslinux
+		[ -n "$VARBOOT" ] && SYSLINUX=`echo -en "$SYSLINUX" | sed s\~" $VARBOOT"~~g`
+		[ -n "$ARG" ] && donesystem || { title; echo "ERROR: Invalid Argument!"; echo; exit; }
+	 fi
+	fi   
+ ;;
+ "-bootdelay")
+	if [ -n "$ARG" ]; then
+	 if [ "$ARG" != "auto" ]; then
+		ISNUMERIC=`echo $ARG | sed 's/[0123456789]//g'`
+		if [ -n "$ISNUMERIC" ]; then
+		 title
+		 echo "ERROR: Invalid argument, use only numbers!"
+		 echo
+		 exit
+		fi
+		opensyslinux
+		[ -n "$VARDELAY" ] && SYSLINUX=`echo -en "$SYSLINUX" | sed s\~" $VARDELAY"~" bootdelay=$ARG"~g` || SYSLINUX=`echo -en "$SYSLINUX bootdelay=$ARG"`
+		donesystem
+	 else
+		opensyslinux
+		[ -n "$VARDELAY" ] && SYSLINUX=`echo -en "$SYSLINUX" | sed s\~" $VARDELAY"~~g`
+		[ -n "$ARG" ] && donesystem || { title; echo "ERROR: Invalid Argument!"; echo; exit; }   
+	 fi
+	fi
+ ;;
+ "-info")
+	opensyslinux
+	[ -n "$VARBOOT" ] && VARBOOT="Boot device $VARBOOT (Custom)" || VARBOOT="Boot device $DEVICE $([ "$MEDIA" = "CUSTOM" ] && echo "(Override boot.info)" || echo "(Automatic)")"
+	[ -n "$VARDELAY" ] && VARDELAY="Boot delay $VARDELAY second(s) (Custom)" || VARDELAY="Boot delay 15 seconds (Default)"
+	title
+	echo "Display information:"
+	echo " + "$VARBOOT
+	echo " + "$VARDELAY
+	echo
+	exit
+ ;;
+ "-repair")
+	SYSLINUX=`echo -en "display SRP.dpy\012timeout 0\012default linux\012append  load_ramdisk=1 initrd=root.tgz initrd_dyn=minix ramdisk_size=4096 root=/dev/ram0"`
+	donesystem
+ ;;
+ "-showdevice")  
+	title
+	echo "  DEVICE     TYPE               MODEL"
+	echo
+	detectboot | sort | while read INFORMATION; do
+	 DEVICE=`echo $INFORMATION | cut -f1 -d"#"`
+	 TYPE=`echo $INFORMATION | cut -f2 -d"#"`
+	 MODEL=`echo $INFORMATION | cut -f3 -d"#"`
+	 echo -e "$(llign /dev/$DEVICE 10) $(llign $TYPE 10) $MODEL"
+	done
+	echo
+	exit
+ ;;
 esac
 usage
-
-
-
-

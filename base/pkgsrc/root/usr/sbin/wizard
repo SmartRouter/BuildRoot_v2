@@ -73,7 +73,7 @@ INTERFACE_NAME() {
 }
 
 SETCONNTYPE(){
- value=`echo $1 | sed s/\ *//g`
+ value=`echo $1 | sed 's/[ ]\ *//g'`
  case $value in
 	DHCP) INETTYPE='ETHERNET_DHCP';;
 	STATIC) INETTYPE='ETHERNET_STATIC';;

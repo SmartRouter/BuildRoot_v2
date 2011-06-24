@@ -10,6 +10,26 @@
 
 [ "$DEBUG" ] && qt () { "$@" ; } || qt () { "$@" >/dev/null 2>&1 ; }
 
+fast_bkp() {
+ # Copy the coyote configuration file to the floppy
+ echo "Saving configuration files"
+ cat /var/lib/lrpkg/*.config_files | while read f; do
+	f1=`echo $f | cut -f 1 -d " "`
+	f2=`echo $f | cut -f 2 -d " "`
+	cat /etc/coyote/$f2 | dos2unix -d > $MNT/config/$f1
+ done
+ # Copy the profiles to the floppy
+ rm -rf $MNT/config/profiles/*
+ ls /etc/coyote/profiles/*.prf > /dev/null 2> /dev/null
+ if [ $? = 0 ] ; then
+	echo "Saving profiles"
+	[ ! -e $MNT/config/profiles ] && mkdir $MNT/config/profiles
+	cp /etc/coyote/profiles/*.prf $MNT/config/profiles
+ fi
+ # Reset the "config dirty" flag
+ [ -r /tmp/need.save ] && rm /tmp/need.save
+}
+
 if [ "$READONLY" = "no" ]; then
  LRPKG="/var/lib/lrpkg"
  MNT="$LRPKG/mnt"
@@ -22,44 +42,30 @@ if [ "$READONLY" = "no" ]; then
  else
 	# Packages that are always backed up
 	if [ -r "$CONFF" ]; then
-	 for F in `cat "$CONFF"`; do
-		if [ "$F" != "root" ] && [ "$F" != "local" ]; then
-		 PKGS="$PKGS $F"
+	 while read TMPLINE ; do
+		if [ "$TMPLINE" != "root" ] && [ "$TMPLINE" != "local" ]; then
+		 PKGS="$PKGS $TMPLINE"
 		fi
-	 done
+	 done < "$CONFF"
 	else
-	 PKGS="etc modules dhcpd webadmin"
+	 PKGS="etc modules webadmin"
 	fi
 	DO_SPECIAL=NO
  fi
-
-echo "Backing up your SmartRouter Configuration..."
-echo
-
-MOUNTCMD="mount -t $FSTYPE /dev/boot "
+ echo "Backing up your SmartRouter Configuration..."
+ echo
+ MOUNTCMD="mount -t $FSTYPE /dev/boot "
  if qt $MOUNTCMD $MNT ; then
-	# Backup packages
-	for CONF in $PKGS; do
-	 $BACKSCRIPT $CONF $WTMP $CWRT && echo "Back-up of $CONF complete" || echo "Unable to back-up $CONF"
-	done
-    	# Copy the coyote configuration file to the floppy
-    	echo "Saving configuration files"
-	cat /var/lib/lrpkg/*.config_files | while read f; do
-	 f1=`echo $f | cut -f 1 -d " "`
-	 f2=`echo $f | cut -f 2 -d " "`
- 	 cat /etc/coyote/$f2 | dos2unix -d > $MNT/config/$f1
-	done
-    	# Copy the profiles to the floppy
-	 rm -rf $MNT/config/profiles/*
-	ls /etc/coyote/profiles/*.prf > /dev/null 2> /dev/null
-	if [ $? = 0 ] ; then
- 	 echo "Saving profiles"
-	 [ ! -e $MNT/config/profiles ] && mkdir $MNT/config/profiles
-	 cp /etc/coyote/profiles/*.prf $MNT/config/profiles
+ 	if [ "$1" = "fast_bkp" ]; then
+	   fast_bkp
+	else
+	   # Backup packages
+	   for CONF in $PKGS; do
+		  $BACKSCRIPT $CONF $WTMP $CWRT && echo "Back-up of $CONF complete" || echo "Unable to back-up $CONF"
+	   done
+	   fast_bkp
+	   echo "done."
 	fi
-    	echo "done."
-	# Reset the "config dirty" flag
-	[ -r /tmp/need.save ] && rm /tmp/need.save
  else
 	echo "Could not mount boot device."
  fi

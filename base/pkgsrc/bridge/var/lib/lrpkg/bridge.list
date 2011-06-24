@@ -1,8 +1,0 @@
-/lib/libebt*.so
-/lib/modules/bridge
-/etc/modules.bridge
-/bin/brctl
-/bin/ebtables
-/etc/ethertypes
-/etc/rc.d/pkgs/mod.zz_bridge
-/var/lib/lrpkg/bridge.list

@@ -2,9 +2,8 @@
 
 export HOSTNAME=`hostname`
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-export PS1="$HOSTNAME# "
+export PS1="\[\e[37;42;1m\h:\e[0;1m\]\w\e[0m\# "
 export TERMINFO=/etc/terminfo
-
 umask 022
 
 if [ -n "$TERM" ] ; then
