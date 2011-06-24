@@ -43,7 +43,7 @@ fi
 
 # Set the hostname
 [ -z "$HOSTNAME" -a -n "$DHCPHOSTNAME" ] && HOSTNAME="$DHCPHOSTNAME"
-[ -z "$HOSTNAME" ] && HOSTNAME="smartrouter"
+[ -z "$HOSTNAME" ] && HOSTNAME="brazilfw"
 hostname $HOSTNAME
 
 # Set the domainname
@@ -84,17 +84,16 @@ echo 60 >	/proc/sys/net/ipv4/netfilter/ip_conntrack_tcp_timeout_fin_wait #120
 echo 60 >	/proc/sys/net/ipv4/netfilter/ip_conntrack_tcp_timeout_time_wait #120
 echo 20 >	/proc/sys/net/ipv4/netfilter/ip_conntrack_udp_timeout #30
 
-#echo 15 >	/proc/sys/net/ipv4/route/gc_elasticity #8
-#echo 14400 >	/proc/sys/net/ipv4/route/secret_interval #600
-#echo 16384 >	/proc/sys/net/ipv4/route/gc_thresh #512
-
+echo 15 >	/proc/sys/net/ipv4/route/gc_elasticity #8
+echo 14400 >	/proc/sys/net/ipv4/route/secret_interval #600
+echo 16384 >	/proc/sys/net/ipv4/route/gc_thresh #512
 echo 32768 >	/proc/sys/net/ipv4/route/max_size
 
-#echo 512 >	/proc/sys/net/ipv4/neigh/default/gc_thresh1 #128
-#echo 1024 >	/proc/sys/net/ipv4/neigh/default/gc_thresh2 #512
-#echo 2048 >	/proc/sys/net/ipv4/neigh/default/gc_thresh3 #1024
-#echo 96 > 	/proc/sys/net/ipv4/neigh/default/proxy_qlen #64
-#echo 6 >	/proc/sys/net/ipv4/neigh/default/unres_qlen #3
+echo 512 >	/proc/sys/net/ipv4/neigh/default/gc_thresh1 #128
+echo 1024 >	/proc/sys/net/ipv4/neigh/default/gc_thresh2 #512
+echo 2048 >	/proc/sys/net/ipv4/neigh/default/gc_thresh3 #1024
+echo 96 > 	/proc/sys/net/ipv4/neigh/default/proxy_qlen #64
+echo 6 >	/proc/sys/net/ipv4/neigh/default/unres_qlen #3
 
 echo 4096 87380 262144 >	/proc/sys/net/ipv4/tcp_rmem #Receive Window vector 4096 87380 174760
 echo 4096 87380 262144 >	/proc/sys/net/ipv4/tcp_wmem #Send Window vector 4096 16384 131072
@@ -127,10 +126,8 @@ echo 2 >	/proc/sys/net/ipv4/tcp_synack_retries #5
 echo 3 >	/proc/sys/net/ipv4/tcp_syn_retries #5
 # Allow reuse of TIME-WAIT sockets for new connections
 echo 1 >	/proc/sys/net/ipv4/tcp_tw_reuse
-#echo 1 >	/proc/sys/net/ipv4/tcp_rfc1337
-#echo 0 >	/proc/sys/net/ipv4/tcp_timestamps
+echo 0 >	/proc/sys/net/ipv4/tcp_timestamps
 #echo 2 >	/proc/sys/net/ipv4/tcp_default_win_scale
-#echo 1 >	/proc/sys/net/ipv4/tcp_moderate_rcvbuf
 # don't cache ssthresh from previous connection
 #echo 1 >	/proc/sys/net/ipv4/tcp_no_metrics_save
 
@@ -169,6 +166,8 @@ iptables -t mangle -I FORWARD -j tos
 iptables -t mangle -I OUTPUT -j tos
 iptables -t mangle -N conlimit
 iptables -t mangle -I FORWARD -j conlimit
+iptables -t mangle -N connmark
+iptables -t mangle -I POSTROUTING -j connmark
 
 # Create the port-forward rulesets
 iptables -N portfw-acl
@@ -181,6 +180,7 @@ iptables -t nat -N nat-acl
 iptables -t nat -N dns-postroute
 iptables -t nat -N nat-masks
 iptables -t nat -N subnets-masks
+iptables -t nat -N snat-acl
 
 iptables -I FORWARD -j portfw-acl
 iptables -I FORWARD -j autofw-acl
@@ -191,6 +191,7 @@ iptables -t nat -I PREROUTING -j nat-acl
 iptables -t nat -I POSTROUTING -j dns-postroute
 iptables -t nat -I POSTROUTING -j nat-masks
 iptables -t nat -I POSTROUTING -j subnets-masks
+iptables -t nat -I POSTROUTING -j snat-acl
 
 # Access Control, moved to here to block even established connections
 iptables -I FORWARD -j access-acl
@@ -356,7 +357,7 @@ case "$INETTYPE" in
  ;;
  *)
 	echo "-------------------- !! ERROR !! ---------------------"
-	echo " This copy of system is not properly configured "
+	echo " This copy of BrazilFW is not properly configured "
 	echo
 	echo " No valid Internet Connection type has been specified "
 	echo "------------------------------------------------------"

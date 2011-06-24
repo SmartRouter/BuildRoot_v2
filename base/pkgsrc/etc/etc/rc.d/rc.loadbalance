@@ -33,6 +33,8 @@ echo "Starting Load Balance..."
  GW=$GATEWAY
 
 echo -n " Removing old route rules ..."
+$IPTABLES -t mangle -F connmark
+$IPTABLES -t nat -F snat-acl
 $IP rule | sed s/\ */" "/g > /tmp/route.txt
 while read A B C D E F G; do
  PRIO=`echo $A | cut -f1 -d":"`
@@ -42,7 +44,10 @@ while read A B C D E F G; do
 	 $IP route flush table $E
 	;;
 	100)
-	 $IP rule del prio 100 to $E table $G
+	 case $C in
+		any|all) $IP rule del prio 100 to $E table $G;;
+		*) $IP rule del prio 100 from $C to $E table $G;;
+	 esac
 	 $IP route flush table $G
 	;;
 	150)
@@ -68,6 +73,24 @@ echo " DONE"
 $IP route add default via $GW
 
 #==================================
+find_wan() {
+ case $1 in
+  1)
+   IF="$IF_INET"
+   IPA="$IPADDR"
+   GTW="$GATEWAY"
+   MSK="$NETMASK"
+  ;;
+  *)
+   IF="$(eval "echo \${$(echo IF_INET${1})}")"
+   IPA="$(eval "echo \${$(echo INET${1}_IPADDR)}")"
+   GTW="$(eval "echo \${$(echo INET${1}_GATEWAY)}")"
+   MSK="$(eval "echo \${$(echo INET${1}_NETMASK)}")"
+  ;;
+ esac
+}
+
+#==================================
 find_lan() {
  case "$1" in
 	LAN1)	LAN=$IF_LOCAL ;;
@@ -83,9 +106,15 @@ find_lan() {
 #==================================
 dest() {
  if [ "$1" = "y" ]; then
+	case $3 in
+	 any|all) ADDRESS="0.0.0.0/0";;
+	 *) ADDRESS="$3";;
+	esac
 	ID=`echo $2 | cut -c3`
-#	$IP rule add prio 20"$ID" to ${3} table 20"$ID"
-	$IP rule add prio 100 to ${3} table 20"$ID"
+	find_wan $ID
+	$IP rule add prio 100 from $ADDRESS to ${4} table 20"$ID"
+#	$IP route add ${4} dev $LAN table 20"$ID"
+	$IPTABLES -t nat -A snat-acl -o $IF -s $ADDRESS -d ${4} -j SNAT --to $IPA
  fi
 }
 
@@ -93,7 +122,9 @@ dest() {
 port() {
  if [ "$1" = "y" ]; then
 	ID=`echo $2 | cut -c3`
-	$IPTABLES -t mangle -A PREROUTING -i ! $IF_INET -p $3 --dport $4 -j MARK --set-mark $ID
+	find_wan $ID
+	$IPTABLES -t mangle -A connmark -o $IF -p $3 --dport $4 -j MARK --set-mark $ID
+	$IPTABLES -t nat -A snat-acl -o $IF -p $3 --dport $4 -j SNAT --to $IPA
  fi
 }
 
@@ -102,9 +133,8 @@ net() {
  if [ "$1" = "y" ]; then
 	ID=`echo $2 | cut -c3`
 	find_lan $3
-#	$IP rule add prio 20"$ID" from ${4}/${5} table 20"$ID"
-	$IP rule add prio 250 from ${4}/${5} table 20"$ID"
-	$IP route add ${4}/${5} dev $LAN table 20"$ID"
+	$IP rule add prio 250 from ${4} table 20"$ID"
+	$IP route add ${4} dev $LAN table 20"$ID"
  fi
 }
 

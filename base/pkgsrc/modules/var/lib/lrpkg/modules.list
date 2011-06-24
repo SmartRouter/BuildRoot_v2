@@ -3,3 +3,4 @@ etc/rc.d/rc.modules
 bin/vconfig
 lib/modules
 var/lib/lrpkg/modules.*
+/etc/l7-protocols/*.pat

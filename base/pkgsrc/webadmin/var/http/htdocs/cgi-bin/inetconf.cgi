@@ -7,7 +7,6 @@
 . /tmp/netsubsys.state
 
 SCRIPT="inetconf.cgi"
-
 mount_configuration_1() {
 case $INETTYPE in
  "ETHERNET_DHCP")
@@ -127,7 +126,6 @@ end_table
 }
 
 show_form_1(){
-create_network_graph
 show_form_head
 add_title "$Eia"
  form_info_item "$Icc" "" "$(init_combobox "INETTYPE") \
@@ -135,7 +133,7 @@ add_title "$Eia"
 				$(add_item_combobox "ETHERNET_STATIC" "STATIC" "`[ "$INETTYPE" = "ETHERNET_STATIC" ] && echo selected`") \
 				$(add_item_combobox "PPPOE" "PPPOE" "`[ "$INETTYPE" = "PPPOE" ] && echo selected`") \
 				$(add_item_combobox "PPP" "PPP" "`[ "$INETTYPE" = "PPP" ] && echo selected`")
-			  $(end_combobox)<input type=submit value="$Fsb" name=OKBTN>"
+			  $(end_combobox)"
 add_title "$Ptk"
  case $INETTYPE in
 	ETHERNET_DHCP)
@@ -216,21 +214,21 @@ show_form_end "WAN1"
 show_form_2(){
 show_form_head
 add_title "$Ptl"
- form_info_item "$Psd" "" "$(input_text "IF_NET2" "${IF_NET2}" "5")"
+ form_info_item "$Psd" "" "$(input_text "IF_INET2" "${IF_INET2}" "5")"
  form_info_item "$Lpi,<br>$Anm<br>$Wed $Edg" "" "$(input_text "INET2_IPADDR" "${INET2_IPADDR}" "20")<br>$(input_text "INET2_NETMASK" "${INET2_NETMASK}" "20")<br>$(input_text "INET2_GATEWAY" "${INET2_GATEWAY}" "20")"
 show_form_end "WAN2"
 }
 show_form_3(){
 show_form_head
 add_title "$Ptm"
- form_info_item "$Psd" "" "$(input_text "IF_NET3" "${IF_NET3}" "5")"
+ form_info_item "$Psd" "" "$(input_text "IF_INET3" "${IF_INET3}" "5")"
  form_info_item "$Lpi,<br>$Anm<br>$Wed $Edg" "" "$(input_text "INET3_IPADDR" "${INET3_IPADDR}" "20")<br>$(input_text "INET3_NETMASK" "${INET3_NETMASK}" "20")<br>$(input_text "INET3_GATEWAY" "${INET3_GATEWAY}" "20")"
 show_form_end "WAN3"
 }
 show_form_4(){
 show_form_head
 add_title "$Ptn"
- form_info_item "$Psd" "" "$(input_text "IF_NET4" "${IF_NET4}" "5")"
+ form_info_item "$Psd" "" "$(input_text "IF_INET4" "${IF_INET4}" "5")"
  form_info_item "$Lpi,<br>$Anm<br>$Wed $Edg" "" "$(input_text "INET4_IPADDR" "${INET4_IPADDR}" "20")<br>$(input_text "INET4_NETMASK" "${INET4_NETMASK}" "20")<br>$(input_text "INET4_GATEWAY" "${INET4_GATEWAY}" "20")"
 show_form_end "WAN4"
 }
@@ -241,13 +239,13 @@ add_title "DNS"
  form_info_item "$Afs $Ids" "" "$(input_text "DNS2" "${DNS2}" "20")"
  form_info_item "$Afs $Ids" "" "$(input_text "DNS3" "${DNS3}" "20")"
  form_info_item "$Edn" "" "$(input_text "DOMAINNAME" "${DOMAINNAME}" "20")"
-show_form_end "WLAN"
+show_form_end "DNS"
 }
 
 cl_header2 "$Ecf"
 case "$FORM_OKBTN" in
  "WAN1") INETTYPE=$FORM_INETTYPE
-		 mount_configuration_1 
+	  mount_configuration_1 
 		 ;;
  "WAN2") mount_configuration_2 ;;
  "WAN3") mount_configuration_3 ;;

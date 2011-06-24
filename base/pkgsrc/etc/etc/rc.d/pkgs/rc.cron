@@ -1,17 +1,53 @@
 #!/bin/sh
-# 
 # Cron Starting Script
 # Claudio Roberto Cussuol - 09-24-2004
-#
+# Modified for Smart Router Project by user Marcos do Vale in 13/03/2011
 
 . /etc/coyote/coyote.conf
-if [ "$ENABLE_CRON" = "YES" ] ; then
- which crond > /dev/null 2> /dev/null
- if [ $? = 0 ] ; then
-	echo "Starting cron"
-	logger "Starting cron"
-	crond
+
+RUNNING="NO"
+[ -z "`pidof crond`" ] || RUNNING="YES"
+
+start(){
+ echo -n "Starting crond ..."
+ if [ "$RUNNING" = "YES" ]; then
+	echo "already started"
+	reload
  else
-	echo "ERROR: Cron is not installed and could not be started"
+	crond
+	if [ $? = 0 ]; then
+	 echo "OK"
+	 logger "Starting crond OK"
+	else
+	 echo "ERROR"
+	 logger "Starting crond ERROR"
+	fi
  fi
-fi
+}
+
+stop(){
+ echo -n "Stopping crond ..."
+ if [ "$RUNNING" = "NO" ]; then
+	echo "already stoped"
+ else
+	kill "`pidof crond`"
+	if [ $? = 0 ]; then
+	 echo "STOP"
+	 logger "Stopping crond OK"
+	else
+	 echo "ERROR"
+	 logger "Stopping crond ERROR"
+	fi
+ fi
+}
+
+reload(){
+ echo "Crond will be reload within the next minute"
+ logger "Crond will be reload within the next minute"
+ crontab /var/spool/cron/crontabs/root
+}
+
+case $1 in
+ reload) [ "$RUNNING" = "YES" ] && reload || start;;
+ *) [ "$ENABLE_CRON" = "YES" ] && start || stop;;
+esac

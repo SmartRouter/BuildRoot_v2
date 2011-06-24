@@ -46,7 +46,6 @@ treat_line() {
  LB=${3}
  LAN=${4}
  NET=${5}
- MASK=${6}
  COMMENT=`echo $TMPLINE | sed s/.*#//`
  [ "$COMMENT" = "$TMPLINE" ] && COMMENT=""
  DCOMMENT=$COMMENT
@@ -56,13 +55,13 @@ treat_line() {
 #==================================
 show_list_port() {
  init_main_table
- add_title "Porta" "6"
- header_table "$Faj" "LINK" "$Paj" "$Pbp" "$Pbr" "$Fad"
+ add_title "Porta" "5"
+ header_table "$Faj" "LINK" "$Paj" "$Pbp" "$Fad"
  LINECOUNT=0
- awk -vFno=$Fno -vFye=$Fye -F"#" "$AWK_SCRIPT" $FILE | while read TYPE ACTIVE LB PROTO INIT END COMMENT; do
+ awk -vFno=$Fno -vFye=$Fye -F"#" "$AWK_SCRIPT" $FILE | while read TYPE ACTIVE LB PROTO INIT COMMENT; do
 	LINECOUNT=$(($LINECOUNT+1))
 	case "$TYPE" in
-	 port*) output_line "$ACTIVE" "$LB" "$PROTO" "$INIT" "$END" "$COMMENT";;
+	 port*) output_line "$ACTIVE" "$LB" "$PROTO" "$INIT" "$COMMENT";;
 	esac
  done
 }
@@ -70,25 +69,25 @@ show_list_port() {
 show_list_dest() {
  init_main_table
  add_title "Destino" "5"
- header_table "$Faj" "LINK" "$Aip" "$Anm" "$Fad"
+ header_table "$Faj" "LINK" "IN" "$Aip" "$Fad"
  LINECOUNT=0
- awk -vFno=$Fno -vFye=$Fye -F"#" "$AWK_SCRIPT" $FILE | while read TYPE ACTIVE LB IP MASK COMMENT; do
+ awk -vFno=$Fno -vFye=$Fye -F"#" "$AWK_SCRIPT" $FILE | while read TYPE ACTIVE LB LAN IP COMMENT; do
 	LINECOUNT=$(($LINECOUNT+1))
 	case "$TYPE" in
-	 dest*) output_line "$ACTIVE" "$LB" "$IP" "$MASK" "$COMMENT";;
+	 dest*) output_line "$ACTIVE" "$LB" "$LAN" "$IP" "$COMMENT";;
 	esac
  done
 }
 #==================================
 show_list_net() {
  init_main_table
- add_title "Origem" "6"
- header_table "$Faj" "LINK" "LAN" "$Aip" "$Anm" "$Fad"
+ add_title "Origem" "5"
+ header_table "$Faj" "LINK" "LAN" "$Aip" "$Fad"
  LINECOUNT=0
- awk -vFno=$Fno -vFye=$Fye -F"#" "$AWK_SCRIPT" $FILE | while read TYPE ACTIVE LB LAN IP MASK COMMENT; do
+ awk -vFno=$Fno -vFye=$Fye -F"#" "$AWK_SCRIPT" $FILE | while read TYPE ACTIVE LB LAN IP COMMENT; do
 	LINECOUNT=$(($LINECOUNT+1))
 	case "$TYPE" in
-	 net*) output_line "$ACTIVE" "$LB" "$LAN" "$IP" "$MASK" "$COMMENT";;
+	 net*) output_line "$ACTIVE" "$LB" "$LAN" "$IP" "$COMMENT";;
 	esac
  done
 }
@@ -209,23 +208,20 @@ case $METHOD in
   [ ! -z $IF_WLAN ] && echo "<option value=WLAN `[ "$LAN" = "WLAN" ] && echo selected`>WLAN</option>"
   [ ! -z $IF_DMZ ] && echo "<option value=DMZ `[ "$LAN" = "DMZ" ] && echo selected`>DMZ</option>"
   echo "</td></tr>
-  <tr><td class=row1 align=right><b>$Aip</b></td>"
-  echo "<td class=row2><input type=text size=22 name=NET value="$NET"></td></tr>
-  <tr><td class=row1 align=right><b>$Anm</b></td>
-  <td class=row2><input type=text size=22 name=MASK value="$MASK"></td></tr>"
+  <tr><td class=row1 align=right><b>$Aip</b></td>
+  <td class=row2><input type=text size=22 name=NET value="$NET"></td></tr>"
  ;;
  P)
   echo "$Paj</b></td><td class=row2><select name=LAN>"
   echo "<option value=tcp `[ "$LAN" = "tcp" ] && echo selected`>TCP</option>"
   echo "<option value=udp `[ "$LAN" = "udp" ] && echo selected`>UDP</option>"
   echo "</td></tr>
-  <tr><td class=row1 align=right><b>$Pbp</b></td>"
-  echo "<td class=row2><input type=text size=10 name=NET value="$NET"></td></tr>
-  <tr><td class=row1 align=right><b>$Pbr</b></td>
-  <td class=row2><input type=text size=10 name=MASK value="$MASK"></td></tr>"
+  <tr><td class=row1 align=right><b>$Pbp</b></td>
+  <td class=row2><input type=text size=10 name=NET value="$NET"></td></tr>"
  ;;
  D)
-  echo "$Aip</b></td><td class=row2><input type=text size=22 name=LAN value="$LAN"></td></tr>"
+  echo "IN</b></td>
+  <td class=row2><input type=text size=22 name=LAN value="$LAN"></td></tr>"
   echo "<tr><td class=row1 align=right><b>$Anm</b></td>
   <td class=row2><input type=text size=22 name=NET value="$NET"></td></tr>"
  ;;
@@ -235,14 +231,14 @@ echo "<tr><td class=row1 align=right><b>$Fad ($Fop)</b><br>$Egr</td><td class=ro
 }
 #==================================
 # MAIN ROUTINE
-cl_header2 "$Pti - SmartRouter"
+cl_header2 "$Pti - BrazilFW"
 if [ "$FORM_OKBTN" = "$Fsb" ]; then
- [ "$FORM_METHOD" = "P" ] && CONFIG_LINE="port $FORM_ACTIVE $FORM_LB $FORM_LAN $FORM_NET $FORM_MASK #$FORM_COMMENT"
- [ "$FORM_METHOD" = "N" ] && CONFIG_LINE="net $FORM_ACTIVE $FORM_LB $FORM_LAN $FORM_NET $FORM_MASK #$FORM_COMMENT"
+ [ "$FORM_METHOD" = "P" ] && CONFIG_LINE="port $FORM_ACTIVE $FORM_LB $FORM_LAN $FORM_NET #$FORM_COMMENT"
+ [ "$FORM_METHOD" = "N" ] && CONFIG_LINE="net $FORM_ACTIVE $FORM_LB $FORM_LAN $FORM_NET #$FORM_COMMENT"
  [ "$FORM_METHOD" = "D" ] && CONFIG_LINE="dest $FORM_ACTIVE $FORM_LB $FORM_LAN $FORM_NET #$FORM_COMMENT"
  if [ -n "$CONFIG_LINE" ]; then
 	[ "$FORM_ACTION" = "ADD" ] && echo -e "$CONFIG_LINE" >> $FILE \
-	|| sed -i "$FORM_LINE"s/.*/"$CONFIG_LINE"/ $FILE
+	|| sed -i "$FORM_LINE"s,.*,"$CONFIG_LINE", $FILE
  else
 	mount_configuration
  fi

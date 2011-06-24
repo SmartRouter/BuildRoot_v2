@@ -14,9 +14,7 @@
 SCRIPT="cron.cgi"
 FILE="/var/spool/cron/crontabs/root"
 TMPFILE="/tmp/cron"
-RELOAD="/usr/sbin/./cron.reload"
-
-[ "$ENABLE_CRON" = "YES" ] && ENABLE_CRON_YES='checked' || ENABLE_CRON_NO='checked'
+RELOAD="/etc/rc.d/pkgs/rc.cron"
 
 #==================================
 treat_line() {
@@ -61,23 +59,13 @@ treat_line() {
 }
 #==================================
 mount_configuration() {
- MIN="$FORM_MIN"
- HOR="$FORM_HOR"
- DAY="$FORM_DAY"
- MON="$FORM_MON"
- WEK="$FORM_WEK"
- SCR="$FORM_SCR"
- [ -z "$MIN" ] && MIN='XaXlXlX'
- [ -z "$HOR" ] && HOR='XaXlXlX'
- [ -z "$DAY" ] && DAY='XaXlXlX'
- [ -z "$MON" ] && MON='XaXlXlX'
- [ -z "$WEK" ] && WEK='XaXlXlX'
- CONFIG_LINE="$MIN $HOR $DAY $MON $WEK $SCR"
  ENABLE_CRON=$FORM_ENABLE_CRON
  cl_rebuildconf
+ command_reload
 }
 #==================================
 show_list() {
+ [ "$ENABLE_CRON" = "YES" ] && ENABLE_CRON_YES='checked' || ENABLE_CRON_NO='checked'
  init_table "maintable"
  add_new "$Pqi" "$Pqj"
  init_add_control "$Lce"
@@ -86,21 +74,12 @@ show_list() {
  end_add_control
  end_table
  echo "<br>"
- if [ "$ENABLE_CRON" = "YES" ]; then
-	init_form "$SCRIPT?ACTION=RELOAD"
-	init_main_table
-	add_title "$Pjv"
-	form_info_item "$Ban" "" "$(input_radio_cron "ENABLE_CRON" "NO" "$Fno") $(input_radio_cron "ENABLE_CRON" "YES" "$Fye" "checked")"
-	end_table
-	end_form
- else
-	init_form "$SCRIPT?ACTION=RELOAD"
-	init_main_table
-	add_title "$Pjv"
-	form_info_item "$Ban" "" "$(input_radio_cron "ENABLE_CRON" "NO" "$Fno" "checked") $(input_radio_cron "ENABLE_CRON" "YES" "$Fye")"
-	end_table
-	end_form
- fi
+ init_form ""
+ init_main_table
+ add_title "$Pjv"
+ form_info_item "$Ban" "" "$(input_radio "ENABLE_CRON" "NO" "$Fno" "${ENABLE_CRON_NO}") $(input_radio "ENABLE_CRON" "YES" "$Fye" "${ENABLE_CRON_YES}")"
+ end_table
+ end_form
  init_main_table
  add_title "$Msg" "6"
  header_table "$Pqa" "$Pqb" "$Pqc" "$Pqd" "$Pqe" "$Pqf"
@@ -134,7 +113,6 @@ show_form() {
  [ "$FMON" = '*' ] && FMON=""
  [ "$FWEK" = '*' ] && FWEK=""
  init_form
- input_hidden "ENABLE_CRON" "$ENABLE_CRON"
  init_main_table
  add_title "$Msg"
  add_message_form "$Pql"
@@ -151,13 +129,27 @@ show_form() {
 # MAIN ROUTINE
 cl_header2 "$Msg"
 if [ "$FORM_OKBTN" = "$Fsb" ]; then
- mount_configuration
- if [ -n "$CONFIG_LINE" ]; then
-	[ "$FORM_ACTION" = "ADD" ] && addline "${CONFIG_LINE//XaXlXlX/*}" $FILE || changeline $FORM_LINE "${CONFIG_LINE//XaXlXlX/'*'}" $FILE
-	alert "$Pqs" "$Pqu"
+ if [ -n "$FORM_ACTION" ]; then
+	MIN="$FORM_MIN"
+	HOR="$FORM_HOR"
+	DAY="$FORM_DAY"
+	MON="$FORM_MON"
+	WEK="$FORM_WEK"
+	SCR="$FORM_SCR"
+	[ -z "$MIN" ] && MIN='XaXlXlX'
+	[ -z "$HOR" ] && HOR='XaXlXlX'
+	[ -z "$DAY" ] && DAY='XaXlXlX'
+	[ -z "$MON" ] && MON='XaXlXlX'
+	[ -z "$WEK" ] && WEK='XaXlXlX'
+	CONFIG_LINE="$MIN $HOR $DAY $MON $WEK $SCR"
+	if [ -n "$CONFIG_LINE" ]; then
+	 [ "$FORM_ACTION" = "ADD" ] && addline "${CONFIG_LINE//XaXlXlX/*}" $FILE || changeline $FORM_LINE "${CONFIG_LINE//XaXlXlX/'*'}" $FILE
+	fi
+ else
+	mount_configuration
  fi
-fi
-
+ alert "$Pqs" "$Pqu"
+else
 case "$FORM_ACTION" in
  "DELETE")
 	deleteline "$FORM_LINE" $FILE
@@ -179,5 +171,5 @@ case "$FORM_ACTION" in
  "RELOAD") command_reload;;
  *) show_list;;
 esac
-
+fi
 cl_footer2

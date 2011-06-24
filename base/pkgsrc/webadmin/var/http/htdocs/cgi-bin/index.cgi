@@ -241,7 +241,7 @@ case "$INETTYPE" in
   init_main_table
   add_title "$Ani" "5"
   header_table "Interface" "Nome" "Descrição" "$Ast" "$Aei" "GATEWAY"
-  output_line "$IF_INET" "$INTERNET_TYPE <b>WAN1</b>" "$LINET_UP" " $dhcp_ip / $dhcp_mask  [ <a href=diags.cgi?COMMAND=/usr/sbin/dhcp.release><u>$Abh</u></a> | <a href=diags.cgi?COMMAND=/usr/sbin/dhcp.renew><u>$Abi</u></a> ]" "$dhcp_router [ <a href=diags.cgi?COMMAND=/usr/sbin/gateway.test><u>$Abf</u></a> ]"
+  output_line "$IF_INET" "<b>WAN1</b>" "$INTERNET_TYPE" "$LINET_UP" " $dhcp_ip / $dhcp_mask  [ <a href=diags.cgi?COMMAND=/usr/sbin/dhcp.release><u>$Abh</u></a> | <a href=diags.cgi?COMMAND=/usr/sbin/dhcp.renew><u>$Abi</u></a> ]" "$dhcp_router [ <a href=diags.cgi?COMMAND=/usr/sbin/gateway.test><u>$Abf</u></a> ]"
  ;;
  PPP*)
   init_main_table
@@ -257,14 +257,14 @@ case "$INETTYPE" in
 esac
  [ -n "$IPADDR2" ] && output_line "$IF_INET" "<b>WAN1</b>" "$And $Aei" "$LINET_UP" "$IPADDR2 / $NETMASK2" ""
  [ -n "$IPADDR3" ] && output_line "$IF_INET" "<b>WAN1</b>" "$Ard $Aei" "$LINET_UP" "$IPADDR3 / $NETMASK3" ""
- [ -n "$LINET2_UP" ] && output_line "$IF_INET2" "<b>WAN2</b>" "$Pua" "$LINET2_UP" "$INET2_IPADDR / $INET2_NETMASK" "$INET2_GATEWAY"
- [ -n "$LINET3_UP" ] && output_line "$IF_INET3" "<b>WAN3</b>" "$Pub" "$LINET3_UP" "$INET3_IPADDR / $INET3_NETMASK" "$INET3_GATEWAY"
- [ -n "$LINET4_UP" ] && output_line "$IF_INET4" "<b>WAN4</b>" "$Puc" "$LINET4_UP" "$INET4_IPADDR / $INET4_NETMASK" "$INET4_GATEWAY"
+ [ -n "$IF_INET2" ] && output_line "$IF_INET2" "<b>WAN2</b>" "$Ptl" "$LINET2_UP" "$INET2_IPADDR / $INET2_NETMASK" "$INET2_GATEWAY"
+ [ -n "$IF_INET3" ] && output_line "$IF_INET3" "<b>WAN3</b>" "$Ptm" "$LINET3_UP" "$INET3_IPADDR / $INET3_NETMASK" "$INET3_GATEWAY"
+ [ -n "$IF_INET4" ] && output_line "$IF_INET4" "<b>WAN4</b>" "$Ptn" "$LINET4_UP" "$INET4_IPADDR / $INET4_NETMASK" "$INET4_GATEWAY"
 end_table
 #DNS
 if [ -e "/tmp/realdns1" ]; then
 init_main_table
- add_title "$Adi - [ <a href=diags.cgi?COMMAND=/usr/sbin/dns.test><u>$Abg</u></a> ]" "4"
+ add_title "$Adi - [ <a href=diags.cgi?COMMAND=/usr/sbin/dns.test><font color=#ABDA4D><u>$Abg</u></font></a> ]" "4"
  header_table "$Apn" "$Asn" "$Atn"
  output_line "`cat /tmp/realdns1`" "`cat /tmp/realdns2`" "`cat /tmp/realdns3`"
 end_table
@@ -278,10 +278,9 @@ init_main_table
  output_line "$IF_LOCAL" "<b>LAN1</b>" "$Ali" "$LLOCAL_UP" "$LOCAL_IPADDR / $LOCAL_NETMASK"
  [ -n "$LOCAL_IPADDR2" ] && output_line "$IF_LOCAL" "<b>LAN1</b>" "$And $Ali" "$LLOCAL_UP" "$LOCAL_IPADDR2 / $LOCAL_NETMASK2"
  [ -n "$LOCAL_IPADDR3" ] && output_line "$IF_LOCAL" "<b>LAN1</b>" "$Ard $Ali" "$LLOCAL_UP" "$LOCAL_IPADDR3 / $LOCAL_NETMASK3"
- [ -n "$LOCAL2_UP" ] && output_line "$IF_LOCAL2" "<b>LAN2</b>" "$Pua" "$LLOCAL2_UP" "$LOCAL2_IPADDR / $LOCAL2_NETMASK"
- [ -n "$LOCAL3_UP" ] && output_line "$IF_LOCAL3" "<b>LAN3</b>" "$Pub" "$LLOCAL3_UP" "$LOCAL3_IPADDR / $LOCAL3_NETMASK"
- [ -n "$LOCAL4_UP" ] && output_line "$IF_LOCAL4" "<b>LAN4</b>" "$Puc" "$LLOCAL4_UP" "$LOCAL4_IPADDR / $LOCAL4_NETMASK"
- [ -n "$WLAN_UP" ] && output_line "$IF_WLAN" "<b>WLAN</b>" "$Pud" "$LWLAN_UP" "$WLAN_IPADDR / $WLAN_NETMASK"
+ [ -n "$IF_LOCAL2" ] && output_line "$IF_LOCAL2" "<b>LAN2</b>" "$Pua" "$LLOCAL2_UP" "$LOCAL2_IPADDR / $LOCAL2_NETMASK"
+ [ -n "$IF_LOCAL3" ] && output_line "$IF_LOCAL3" "<b>LAN3</b>" "$Pub" "$LLOCAL3_UP" "$LOCAL3_IPADDR / $LOCAL3_NETMASK"
+ [ -n "$IF_LOCAL4" ] && output_line "$IF_LOCAL4" "<b>LAN4</b>" "$Puc" "$LLOCAL4_UP" "$LOCAL4_IPADDR / $LOCAL4_NETMASK"
 end_table
 
 #DMZ

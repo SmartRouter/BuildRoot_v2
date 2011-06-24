@@ -60,3 +60,4 @@
 /usr/lib/mod_scgi.so
 /usr/lib/mod_staticfile.so
 /usr/lib/mod_status.so
+/var/http/htdocs/imagens_doacao/*
