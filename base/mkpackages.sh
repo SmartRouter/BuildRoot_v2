@@ -107,7 +107,7 @@ buildall() {
 
   cd pkgsrc
 #  buildpkg advroute
-#  buildpkg bridge
+  buildpkg bridge
 #  buildpkg dhcpd
   buildpkg etc
   buildpkg iwtools

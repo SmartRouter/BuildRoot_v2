@@ -14,4 +14,4 @@ fi
 # Reload firewall rules
 [ -x /etc/rc.d/rc.firewall ] && /etc/rc.d/rc.firewall $1
 # Reload QOS
-#[ -x /etc/rc.d/rc.qos ] && /etc/rc.d/rc.qos
+[ -x /etc/rc.d/rc.qos ] && /etc/rc.d/rc.qos

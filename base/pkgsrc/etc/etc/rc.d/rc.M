@@ -67,6 +67,7 @@ echo "Starting network subsystems"
 
 # Start the network
 . /etc/rc.d/rc.inet
+[ -x /etc/rc.d/rc.subnet ] && . /etc/rc.d/rc.subnet
 
 # Start any additional packages that were added
 echo "Starting addon packages..."
@@ -76,8 +77,6 @@ for RCS in `ls rc.*`; do
   [ -x $RCS ] && /etc/rc.d/pkgs/$RCS
 done
 cd $SAVEDIR
-
-[ -x /etc/rc.d/rc.subnet ] && . /etc/rc.d/rc.subnet
 
 echo "Starting local packages..."
 # Start any misc local commands
