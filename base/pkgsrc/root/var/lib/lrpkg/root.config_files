@@ -10,3 +10,4 @@ cron.cfg ../../var/spool/cron/crontabs/root
 subnet.cfg subnet.cfg
 dnsmasq.cfg ../dnsmasq.conf.template
 rclocal.cfg ../rc.d/rc.local
+route.cfg route.cfg

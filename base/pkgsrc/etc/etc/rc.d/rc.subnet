@@ -18,7 +18,7 @@ elif [ -z "$IF_INET" ]; then
 fi
 
 find_lan() {
-  case "$1" in
+ case "$1" in
 	LAN1)	LAN=$IF_LOCAL ;;
 	LAN2)	LAN=$IF_LOCAL2 ;;
 	LAN3)	LAN=$IF_LOCAL3 ;;
@@ -26,7 +26,7 @@ find_lan() {
 	WLAN)	LAN=$IF_WLAN ;;
 	DMZ)	LAN=$IF_DMZ ;;
 	*)	LAN=$IF_LOCAL ;;
-  esac
+ esac
 }
 
 subnet() {
@@ -36,12 +36,15 @@ if [ "$1" = "Y" -o "$1" = "y" ]; then
  MASK=$4
  find_lan $11
  [ -z $12 ] && LAN_ID=$ID || LAN_ID=$12
- $ip addr add $IP/$MASK brd + dev $LAN label $LAN:$LAN_ID
+ [ -z $13 ] && CONLIMIT=0 || CONLIMIT=$13
  echo -n "Create subnet $IP/$MASK"
- if [ "$DISABLE_NAT" != "YES" ]; then
-  $IPTABLES -t nat -I subnets-masks -s $IP/$MASK -o $IF_INET -j MASQUERADE
-  echo " - MASQUERADE via $IF_INET"
- fi
+ $ip addr add $IP/$MASK brd + dev $LAN label $LAN:$LAN_ID
+ [ "$CONLIMIT" != 0 ] && { echo " - Building connection limit: $CONLIMIT";
+	$IPTABLES -t nat -A subnets-masks -p tcp -s $IP/$MASK -m state ! --state RELATED \
+	-m connlimit --connlimit-above $CONLIMIT --connlimit-mask 32 -j DROP; }
+ [ "$DISABLE_NAT" != "YES" ] && { $IPTABLES -t nat -A subnets-masks -s $IP/$MASK -o $IF_INET -j MASQUERADE;
+	echo " - MASQUERADE via $IF_INET"; } || echo " NO MASQUERADE"
+ $IPTABLES -t nat -A subnets-masks -s $IP/$MASK -j RETURN
 fi
 }
 
@@ -57,5 +60,3 @@ if [ -e /etc/coyote/subnet.cfg ]; then
  [ ! -z $IF_DMZ ] && $ip -s -s addr flush label $IF_DMZ:*
  . /etc/coyote/subnet.cfg
 fi
-
-

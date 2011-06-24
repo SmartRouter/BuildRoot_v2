@@ -8,6 +8,14 @@
 # Have busybox create the symbolic links
 /bin/busybox --install -s
 
+sleep 1
+rm /sbin/poweroff
+rm /sbin/reboot
+cp /bin/poweroff.tpl /bin/poweroff
+cp /bin/reboot.tpl /bin/reboot
+ln -s /bin/poweroff /sbin/poweroff
+ln -s /bin/reboot /sbin/reboot
+
 mkdir /dev/inet
 mkdir /tmp
 mkdir /mnt
@@ -281,9 +289,23 @@ fi
 
 umount $MNT
 
+. /etc/coyote/coyote.conf
+
+echo "Set the system clock"
+if [ -z "$TZ" ]; then
+ TZ="$(cat /etc/timezone)"
+ echo "TZ=$TZ" >> /etc/coyote/coyote.conf
+else
+ echo "$TZ" > /etc/timezone
+fi
+cp /etc/timezone /etc/TZ
+export TZ
+
+# Set the clock using bios
+[ -x /sbin/hwclock ] && /sbin/hwclock -s -l
+
 # New Mount Partition by Washington Rodrigues 2008 #
 
-. /etc/coyote/coyote.conf
 if [ "$MEDIA" != "CDROM" ]; then
 
    if [ -z "$PARTITION" ]; then

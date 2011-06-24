@@ -32,8 +32,8 @@ mtu 1492
 holdoff 5
 maxfail 0
 
-lcp-echo-interval 20
-lcp-echo-failure 3
+lcp-echo-interval 60
+lcp-echo-failure 5
 
 novj
 novjccomp

@@ -77,6 +77,7 @@ DNS2=$FORM_DNS2
 DNS3=$FORM_DNS3
 IF_INET=$FORM_IF_INET
 cl_rebuildconf
+. /usr/sbin/write_state.sh
 echo "<center><div id=alerta>$Wsv<br><a href=backup.cgi class=links>$Wtl</a></div>
 <br><div id=back><a href=$SCRIPT class=links>$Egj</a><br></div></center>"
 }

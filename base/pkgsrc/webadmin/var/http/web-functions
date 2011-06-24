@@ -13,7 +13,7 @@ cr2br () {
  ${@} | while read LINES; do
 	echo "${LINES} <br>"
  done
-}	
+}
 cl_header () {
  echo -n "Content-type: text/html
 
@@ -39,7 +39,7 @@ cl_header2 () {
 	cl_menuitem "$Mln" "/cgi-bin/lanconf.cgi"
 	cl_menuitem "$Mic" "/cgi-bin/inetconf.cgi"
 	cl_menuitem "$Pti" "/cgi-bin/loadbalance.cgi"
-	cl_menuitem "$Mdz" "/cgi-bin/dmzconf.cgi"
+	[ ! -z $DMZ_IPADDR ] && cl_menuitem "$Mdz" "/cgi-bin/dmzconf.cgi"
 	cl_menuitem "$Mdh" "/cgi-bin/dhcpconf.cgi"
 	cl_menuitem "$Mac" "/cgi-bin/adminconf.cgi"
 	cl_menuitem "$Mpf" "/cgi-bin/portfw.cgi"
@@ -69,6 +69,7 @@ cl_footer2 () {
  echo "</td></tr></table></td></tr></table>"
  [ -e /tmp/need.save ] && echo "<br><center><div id=warning>$Wta</div></center>"
  [ -e /tmp/need.reboot ] && echo "<br><center><div id=warning>$Wtb</div></center>"
+echo "</body></html>"
 }
 # ---- Rebuild Conf File ---------------------------------------------------
 cl_rebuildconf () {
@@ -87,3 +88,175 @@ CLEOF
  rm /tmp/CLDIRECTIVES
  touch /tmp/need.save
 }
+
+# New features
+init_main_table() {
+ echo "<table class=\"maintable\" border=0 width=\"100%\">"
+}
+
+init_table() {
+ echo "<table class=\"$1\">"
+}
+
+end_table() {
+ echo "</table>"
+}
+
+add_title() {
+ [ -z $2 ] && echo "   <tr><th colspan=2>$1</th></tr>" || echo "   <tr><th colspan=$(($2+1))>$1</th></tr>"
+}
+
+add_message_form() {
+ echo "   <tr><td width=\"100%\" colspan=2 class=row3 align=center>
+         <b>$1<b>
+      </td></tr>"
+}
+
+header_table() {
+ echo "   <tr>"
+ for argnum in $(seq 1 $#); do
+	eval $(echo "vargs=\$$argnum")
+	header_name="$(echo "$vargs" | cut -f1 -d",")"
+	echo "      <td class=\"header\">$header_name</td>"
+	done
+ echo "      <td class=\"header\">$Fac</td></tr>"
+}
+
+output_line() {
+ [ "$COLOR" = "row8" -o "$COLOR" = "" ] && COLOR="row6" || COLOR="row8"
+ echo "   <tr>"
+ for argnum in $(seq 1 $#); do
+	eval $(echo "items_value=\$$argnum")
+	items_value="$(echo "$items_value")"
+	if [ "$items_value" = "$Fye" -o "$items_value" = "$Fas" ] ; then
+	 echo "      <td class=\"row4\"><small><b>$items_value</b></small></td>"
+	elif [ "$items_value" = "$Fno" -o "$items_value" = "$Fat" ] ; then
+	 echo "      <td class=\"row5\"><small><b>$items_value</b></small></td>"
+	else
+	 echo "      <td class=\"$COLOR\">$items_value</td>"
+	fi
+ done
+ echo "      <td class=\"$COLOR\" nowrap><a href=$SCRIPT?ACTION=CALL_EDIT&LINE=$LINECOUNT>&nbsp;[$Faf]&nbsp;</a>&nbsp;<a href=$SCRIPT?ACTION=DELETE&LINE=$LINECOUNT>&nbsp;[$Fae]&nbsp;</a></td></tr>"
+}
+
+add_new() {
+ echo "   <tr><td class=row1><b>$1</b></td>
+      <td class=row2>[ <a href=$SCRIPT?ACTION=CALL_ADD><u>$2</u></a> ]</td></tr>"
+}
+
+return_page() {
+ echo "   <tr><td class=row1><b>$1</b></td>
+      <td class=row2>[ <a href=$2><u>$3</u></a> ]</td></tr>"
+}
+
+init_add_control() {
+ echo "   <tr><td class=row1><b>$1</b></td>
+      <td class=row2>"
+}
+
+add_control() {
+ echo "         [ <a href=\"$1\"><u>$2</u></a> ]"
+}
+
+end_add_control() {
+ echo "      </td></tr>"
+}
+
+add_new() {
+ echo "   <tr><td class=row1><b>$1</b></td>
+      <td class=row2>[ <a href=$SCRIPT?ACTION=CALL_ADD><u>$2</u></a> ]</td></tr>"
+}
+
+
+init_form() {
+if [ -z $1 ]; then
+ echo "<form method=\"POST\" action=\"$SCRIPT\">
+<input type=hidden value=\"$LINE\" name=LINE><input type=hidden value=\"$ACTION\" name=ACTION>"
+else
+ echo "<form method=\"POST\" action=\"$1\">"
+fi
+}
+
+end_form() {
+ echo "<p align=center><input type=submit value=\"$Fsb\" name=OKBTN>&nbsp;<input type=reset value=\"$Fer\"></p>
+</form>"
+}
+
+input_text() {
+ echo "<input type=text name=$1 value=\"$2\" size=$3>"
+}
+
+input_checkbox() {
+ [ -z $4 ] && echo "<input type=checkbox name=$1 value=\"$2\" >$3</input>" || echo "<input type=checkbox name=$1 value=\"$2\" $4 >$3</input>"
+}
+
+input_hidden() {
+ echo "<input type=hidden name=$1 value=\"$2\">"
+}
+
+input_radio_cron() {
+ [ -z "$4" ] && echo "<input type=radio name=$1 value=\"$2\" >$3" || echo "<input type=radio name=$1 value=\"$2\" checked=$4 >$3"
+}
+
+input_radio() {
+ [ -z $4 ] && echo "<input type=radio name=$1 value=\"$2\" >$3" || echo "<input type=radio name=$1 value=\"$2\" $4 >$3"
+}
+
+init_combobox() {
+ echo "<select name=$1>"
+}
+
+add_item_combobox() {
+ [ -z $3 ] && echo "<option value=\"$1\">$2</option>" || echo "<option value=\"$1\" $3>$2</option>"
+}
+
+end_combobox() {
+ echo "</select>"
+}
+
+form_info_item(){
+if [ -z "$2" ]; then
+ echo "   <tr><td width=\"50%\" class=row1 align=right>
+         <b>$1</b>
+      </td><td width=\"50%\" class=row2>$3</td></tr>"
+else
+ echo "   <tr><td class=row1 align=right>
+         <b>$1</b><br>$2
+      </td><td class=row2>$3</td></tr>"
+fi
+}
+
+alert() {
+ echo "<center><div id=alerta>$1<br>
+<a href=$SCRIPT?ACTION=RELOAD class=lnk><u>$2</u></a><br>
+<a href=backup.cgi class=lnk><u>$Fah</u></a></div></center><br><br>"
+}
+
+command_reload() {
+ echo "<br><center><pre>"
+ $RELOAD
+ echo "</pre></center><center><div id=back><a href=$SCRIPT class=lnk><u>$Fbl</u></a></div></center><br>"
+}
+
+deleteline() {
+if [ -e "$2" ]; then
+ eval $(echo "sed -i '$1"d"' $2")
+ touch /tmp/need.save
+fi
+}
+
+changeline() {
+if [ -e "$3" ]; then
+ eval $(echo "sed -i '$1"s"~.*~$2~' $3")
+ touch /tmp/need.save
+fi
+}
+
+addline() {
+if [ -e "$2" ]; then
+ echo "$1" >> $2
+ touch /tmp/need.save
+fi
+}
+
+

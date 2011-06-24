@@ -1,44 +1,167 @@
 #!/bin/sh
 # BrazilFW Load Balance Script
-# Claudio Roberto Cussuol - 07/14/2006
-# Changed to support Load Balance with IP Alias interfaces in IF_INET
-# by BFW user "marcos do vale" in 28-02-2008
 #	called by: rc.line_up
+# Claudio Roberto Cussuol - 07/14/2006
+# Revision by BFW user "marcos do vale" - 28/02/2008
+# Changed to support Load Balance with IP Alias interfaces in IF_INET
+# Revision by BFW user "marcos do vale" - 18/10/2008
+# Add on-the-fly reload
+# Add check Link State in /tmp/wanx.state
 
 IP="/usr/sbin/ip"
+IPTABLES="/usr/sbin/iptables"
 #IP="echo ip"
+
+echo "Starting Load Balance..."
 
 . /etc/coyote/coyote.conf
 . /tmp/netsubsys.state
 
-$IP ru add prio 50 table main
-$IP ro del default
-$IP ru add prio 222 table 222 #echo "Creating default route table"
+ GW="0.0.0.0"
+ if [ "$INET_UP" = "UP" ] ; then
+  if [ "$INETTYPE" = "PPP" -o "$INETTYPE" = "PPPOE" ] ; then
+   IF_INET=ppp0
+   GATEWAY=`ifconfig ppp0 | grep P-t-P`
+   GATEWAY=`echo $GATEWAY | cut -f 3 -d " "`
+   GATEWAY=`echo $GATEWAY | cut -f 2 -d :`
+  elif [ "$INETTYPE" = "ETHERNET_DHCP" ] ; then
+   . /etc/dhcpc/$IF_INET.info
+   GATEWAY=$dhcp_router
+  fi
+  GW=$GATEWAY
+ fi
+ GW=$GATEWAY
 
-COMMAND="$IP ro add default table 222 proto static "
+echo -n " Removing old route rules ..."
+$IP rule | sed s/\ */" "/g > /tmp/route.txt
+while read A B C D E F G; do
+ PRIO=`echo $A | cut -f1 -d":"`
+ case $PRIO in
+	50)
+	 $IP rule del prio 50 from $C table $E
+	 $IP route flush table $E
+	;;
+	100)
+	 $IP rule del prio 100 to $E table $G
+	 $IP route flush table $G
+	;;
+	150)
+	 $IP rule del prio 150 fwmark $E table $G
+	 $IP route flush table $G
+	;;
+	200)
+	 $IP rule del prio 200
+	;;
+	250)
+	 $IP rule del prio 250 from $C table $E
+	 $IP route flush table $E
+	;;
+	251)
+	 $IP route flush table 251
+	 $IP rule del prio 251
+	;;
+ esac
+done < /tmp/route.txt
+rm /tmp/route.txt
+echo " DONE"
 
-balance() {
- echo "Creating link $1 route table"
- eval `ipcalc -p -n $3 $4`
- COMMAND="$COMMAND nexthop via $5 dev $2 weight $6"
- $IP ru add prio 20  fwmark $1 table 20"$1"
- $IP ru add prio 20"$1" from ${NETWORK}/${PREFIX} table 20"$1"
- $IP ro add default via $5 dev $2 src $3 proto static table 20"$1"
- $IP ro append prohibit default table 20"$1" metric 1 proto static
+$IP route add default via $GW
+
+#==================================
+find_lan() {
+ case "$1" in
+	LAN1)	LAN=$IF_LOCAL ;;
+	LAN2)	LAN=$IF_LOCAL2 ;;
+	LAN3)	LAN=$IF_LOCAL3 ;;
+	LAN4)	LAN=$IF_LOCAL4 ;;
+	WLAN)	LAN=$IF_WLAN ;;
+	DMZ)	LAN=$IF_DMZ ;;
+	*)	LAN=$IF_LOCAL ;;
+ esac
 }
 
-[ -n "$IF_INET_LB1" ] && balance 1 $IF_INET $IPADDR $NETMASK $GATEWAY $INET_WEIGHT
-[ -n "$IF_INET_LB2" ] && balance 2 $IF_INET2 $INET2_IPADDR $INET2_NETMASK $INET2_GATEWAY $INET2_WEIGHT
-[ -n "$IF_INET_LB3" ] && balance 3 $IF_INET3 $INET3_IPADDR $INET3_NETMASK $INET3_GATEWAY $INET3_WEIGHT
-[ -n "$IF_INET_LB4" ] && balance 4 $IF_INET4 $INET4_IPADDR $INET4_NETMASK $INET4_GATEWAY $INET4_WEIGHT
+#==================================
+dest() {
+ if [ "$1" = "y" ]; then
+	ID=`echo $2 | cut -c3`
+#	$IP rule add prio 20"$ID" to ${3} table 20"$ID"
+	$IP rule add prio 100 to ${3} table 20"$ID"
+ fi
+}
 
-$COMMAND
-$IP ro flush cache
+#==================================
+port() {
+ if [ "$1" = "y" ]; then
+	ID=`echo $2 | cut -c3`
+	$IPTABLES -t mangle -A PREROUTING -i ! $IF_INET -p $3 --dport $4 -j MARK --set-mark $ID
+ fi
+}
 
-$IP ro
-[ -n "$IPADDR" ] && $IP ro ls table 201
-[ -n "$INET2_IPADDR" ] && $IP ro ls table 202
-[ -n "$INET3_IPADDR" ] && $IP ro ls table 203
-[ -n "$INET4_IPADDR" ] && $IP ro ls table 204
-$IP ro ls table 222
+#==================================
+net() {
+ if [ "$1" = "y" ]; then
+	ID=`echo $2 | cut -c3`
+	find_lan $3
+#	$IP rule add prio 20"$ID" from ${4}/${5} table 20"$ID"
+	$IP rule add prio 250 from ${4}/${5} table 20"$ID"
+	$IP route add ${4}/${5} dev $LAN table 20"$ID"
+ fi
+}
 
+#==================================
+balance() {
+# 1 $IF_INET_LB1 $INET_WEIGHT
+ echo -n "Creating link $2 route table ..."
+ ID=`echo "$2" | cut -c4`
+ [ -e /tmp/wan"$ID".state ] && . /tmp/wan"$ID".state || { echo " WAIT"; return; }
+ [ "$LS" = "0" ] || { echo " Link Down"; return; }
+ [ "$#" = "3" ] && WGHT=$3 || WGHT=1
+ case $ID in
+  1)
+   IF="$IF_INET"
+   IPA="$IPADDR"
+   GTW="$GATEWAY"
+   MSK="$NETMASK"
+  ;;
+  *)
+   IF="$(eval "echo \${$(echo IF_INET${1})}")"
+   IPA="$(eval "echo \${$(echo INET${1}_IPADDR)}")"
+   GTW="$(eval "echo \${$(echo INET${1}_GATEWAY)}")"
+   MSK="$(eval "echo \${$(echo INET${1}_NETMASK)}")"
+  ;;
+ esac
+ eval `ipcalc -p -n $IPA $MSK`
+ COMMAND="$COMMAND nexthop via $GTW dev $IF weight $WGHT"
+
+# Add route table for network link
+ $IP route add $IPA via $GTW table 20"$1"
+ $IP route add ${NETWORK}/${PREFIX} dev $IF table 20"$1" #UNDER_LINUX
+# $IP route add ${NETWORK}/${PREFIX} dev $IF src $IPA table 20"$1" #UNDER_LINUX
+# $IP route add default via $GTW dev $IF src $IPA proto static table 20"$1" # original
+ $IP route add default via $GTW dev $IF proto static table 20"$1" # original
+ $IP route append prohibit default table 20"$1" metric 1 proto static # original
+
+# $IP rule add prio 50 from $IPA table 20"$1"
+ $IP rule add prio 50 from ${NETWORK}/${PREFIX} table 20"$1"
+ $IP rule add prio 150 fwmark $1 table 20"$1" #TROBLE WITH QOS
+ echo " DONE"
+}
+
+if [ "$LOAD_BALANCE" = "YES" ]; then
+ echo "0" > /proc/sys/net/ipv4/conf/default/rp_filter
+ $IP rule add prio 200 table main
+ $IP route del default table main
+ COMMAND="$IP route add default table 251 proto static "
+ [ -n "$IF_INET_LB1" ] && balance 1 $IF_INET_LB1 $INET_WEIGHT
+ [ -n "$IF_INET_LB2" ] && balance 2 $IF_INET_LB2 $INET2_WEIGHT
+ [ -n "$IF_INET_LB3" ] && balance 3 $IF_INET_LB3 $INET3_WEIGHT
+ [ -n "$IF_INET_LB4" ] && balance 4 $IF_INET_LB4 $INET4_WEIGHT
+ . /etc/coyote/route.cfg
+ echo -n "Creating default route table ..."
+ $IP rule add prio 251 table 251
+ $COMMAND
+ echo " DONE"
+ $IP route flush cache
+ $IP rule
+ $IP route ls table 251
+fi

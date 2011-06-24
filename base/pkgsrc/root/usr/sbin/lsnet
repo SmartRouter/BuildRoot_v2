@@ -2,6 +2,8 @@
 
 ###########################################################
 # LSNET - Network Device 1.3 by Washington Rodrigues 2008 #
+# Alteraçao na linha nº 53 ----    05/04/2010             #
+# By coidiloco - reportado por thiagofw
 ###########################################################
 IRQC=0
 IOHA=0
@@ -12,6 +14,7 @@ if [ "$1" != "-short" ]; then
    echo "Loading information..." >&2
    echo "" >&2
    echo " LSNET - Network Device 1.3 by Washington Rodrigues 2008 "
+   echo " LSNET - Script com Correçao na linha 53 tanks coidiloco "
    echo "========================================================="
    echo
 fi
@@ -49,9 +52,12 @@ ethinfo() {
 
 }
 COUNT=0
-echo "$NETWORK" | grep -i "<physid\>" | sed s/[^0123456789]//g | sort | while read PHYSICAL; do
+#set -vx
+#echo "$NETWORK" | grep -i "<physid\>" | sed s/[^0123456789]//g | sort | while read PHYSICAL; do
+echo "$NETWORK" | grep -i "<physid\>" | sed s/[^0123456789abcef]//g | sort | while read PHYSICAL; do
                 LN=`echo "$NETWORK" | grep -n "" | grep -i "<physid>$PHYSICAL" | cut -f1 -d":"`
                 POSEND=$((LN+100))
+#set +vx
                 for POS in $(seq $LN -1 0); do
                     POS=`echo "$NETWORK" | grep -n "" | grep -i "^$POS:" | grep -i "<node id" | cut -f1 -d":"`
                     if [ -n "$POS" ]; then

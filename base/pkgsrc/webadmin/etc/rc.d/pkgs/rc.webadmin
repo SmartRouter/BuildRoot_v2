@@ -1,20 +1,41 @@
 #!/bin/sh
 #
-# rc.webadmin - Starts the Coyote Linux web administration frontend
-
-# Make sure that the web admin password and the system root password are
-# in sync
+# Startup Script for Webadmin
+# 2010 - Marcos do Vale
+#
 
 . /etc/coyote/coyote.conf
 
+[ -z "$WEBADMIN_PORT" ] && WEBADMIN_PORT=8180
 ROOTPASS=`grep root: /etc/shadow | cut -f 2 -d :`
-if ! [ -z "$ROOTPASS" ]; then
-    echo "root:$ROOTPASS" > /var/http/htdocs/cgi-bin/.htpasswd
-fi
+! [ -z "$ROOTPASS" ] && echo "root:$ROOTPASS" > /var/http/htdocs/cgi-bin/.htpasswd
+
+conf_file() {
+ cp /etc/lighttpd.tpl /etc/lighttpd.conf
+ echo "
+\$SERVER[\"socket\"] == \""$LOCAL_IPADDR":"$WEBADMIN_PORT"\" {
+auth.backend = \"htpasswd\"
+auth.backend.htpasswd.userfile = \"/var/http/htdocs/cgi-bin/.htpasswd\"
+auth.require = ( \"/cgi-bin/\" => (
+			\"method\"  => \"basic\",
+			\"realm\"   => \"BrazilFW Administration Panel\",
+			\"require\" => \"valid-user\"
+			)
+)
+}
+server.port = \"$WEBADMIN_PORT\"
+server.bind = \"$LOCAL_IPADDR\"" >> /etc/lighttpd.conf
+}
 
 if [ "$ENABLE_WEBADMIN" != "NO" ] ; then
-  if [ -z "$WEBADMIN_PORT" ] ; then WEBADMIN_PORT=8180 ; fi
-  echo "Starting Web Administration Server..."
 
-  /usr/sbin/thttpd -u root -d /var/http/htdocs -nor -h $LOCAL_IPADDR -p $WEBADMIN_PORT -c "/cgi-bin/*"
-fi 
+ pid="`pidof lighttpd`"
+ [ -z "$pid" ] && conf_file || { echo -n "Stop Lighttpd Web Administration Server ..."; \
+ kill -2 $pid; sleep 5; echo " Done"; }
+
+ conf_file
+ echo -n "Starting Lighttpd Web Administration Server ..."
+ /usr/sbin/lighttpd -f /etc/lighttpd.conf
+ sleep 3
+ echo " Done"
+fi

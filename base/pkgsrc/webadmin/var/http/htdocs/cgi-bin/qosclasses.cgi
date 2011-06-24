@@ -180,7 +180,7 @@ if [ "$FORM_OKBTN" = "$Fsb" ]; then
        mv $TMPFILE $FILE
        touch /tmp/need.save
      fi
-     echo "<center><div id=back>$Pig<br><a href=$SCRIPT?ACTION=RELOAD>$Pih</a><br><a href=backup.cgi>$Wtl</a></div>></center><br>"
+     echo "<center><div id=back>$Pig<br><a href=$SCRIPT?ACTION=RELOAD>$Pih</a><br><a href=backup.cgi>$Wtl</a></div></center><br>"
    fi
 fi
 
@@ -197,7 +197,7 @@ case "$FORM_ACTION" in
      rm -f $FILE
      mv $TMPFILE $FILE
      touch /tmp/need.save
-     echo "<center><div id=back>$Pij<br><a href=$SCRIPT?ACTION=RELOAD>$Pih</a><br><a href=backup.cgi>$Wtl</a></div>></center><br>"
+     echo "<center><div id=back>$Pij<br><a href=$SCRIPT?ACTION=RELOAD>$Pih</a><br><a href=backup.cgi>$Wtl</a></div></center><br>"
      show_list
      ;;
    "CALL_EDIT")
@@ -216,7 +216,7 @@ case "$FORM_ACTION" in
    "RELOAD")
      echo "<br><pre>"
      $RELOAD
-     echo "</pre><center><div id=back><a href=$SCRIPT>$Fbk</a></div>></center><br>"
+     echo "</pre><center><div id=back><a href=$SCRIPT>$Fbk</a></div></center><br>"
      ;;
    *)
      show_list

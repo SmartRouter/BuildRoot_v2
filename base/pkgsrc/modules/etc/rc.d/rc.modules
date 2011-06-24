@@ -4,21 +4,18 @@
 
 # Loop over every line in /etc/modules.
 echo 'Loading modules: '
-(cat /etc/modules; echo) | # make sure there is a LF at the end
 while read module args
 do
-	case "$module" in
-		\#*|"") continue ;;
-	esac
-	insmod /lib/modules/"$module".o $args > /dev/null
-done
+ case "$module" in
+	\#*|"") continue ;;
+ esac
+ insmod /lib/modules/"$module".o $args > /dev/null
+done < /etc/modules
 
 FILES=`ls /etc/rc.d/pkgs/mod.* 2>/dev/null`
 if [ ! -z "$FILES" ]; then
-	for RCS in $FILES
-	do
-   		if [ -x $RCS ]; then
-			$RCS
-   		fi
-	done
+ for RCS in $FILES
+ do
+   	[ -x $RCS ] && $RCS
+ done
 fi

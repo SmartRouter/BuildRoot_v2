@@ -36,6 +36,7 @@ if [ "$FORM_OKBTN" = "$Fsb" ]; then
  WLAN_NETMASK=$FORM_WLAN_NETMASK
 
  cl_rebuildconf
+. /usr/sbin/write_state.sh
  echo "<center><div id=alerta>$Lyn<br>$Wtc</div></center>"
 fi
 

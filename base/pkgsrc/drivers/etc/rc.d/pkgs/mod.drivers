@@ -1,9 +1,8 @@
 echo Loading Drivers modules...
-(cat /etc/modules.drivers; echo) | 
 while read module args
 do
-	case "$module" in
-		\#*|"") continue ;;
-	esac
-	insmod /lib/modules/drivers/"$module".o > /dev/null 2> /dev/null
-done
+ case "$module" in
+	\#*|"") continue ;;
+ esac
+ insmod /lib/modules/drivers/"$module".o > /dev/null 2> /dev/null
+done < /etc/modules.drivers

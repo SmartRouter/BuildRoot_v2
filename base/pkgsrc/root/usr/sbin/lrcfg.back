@@ -8,87 +8,69 @@
 #Uncomment for debug mode (don't suppress STDOUT and STDERR)
 #DEBUG=1
 
-if [ "$DEBUG" ] ; then
-	qt () { "$@" ; }
-else
-	qt () { "$@" >/dev/null 2>&1 ; }
-fi
+[ "$DEBUG" ] && qt () { "$@" ; } || qt () { "$@" >/dev/null 2>&1 ; }
+
 if [ "$READONLY" = "no" ]; then
-LRPKG="/var/lib/lrpkg"
-MNT="$LRPKG/mnt"
-WTMP="NO"
-CONFF="$LRPKG/packages"
-
-BACKSCRIPT="/usr/sbin/lrcfg.back.script"
-
-if ! [ -z "$1" ]; then
+ LRPKG="/var/lib/lrpkg"
+ MNT="$LRPKG/mnt"
+ WTMP="NO"
+ CONFF="$LRPKG/packages"
+ BACKSCRIPT="/usr/sbin/lrcfg.back.script"
+ if ! [ -z "$1" ]; then
 	PKGS="$@"
 	DO_SPECIAL=YES
-else
+ else
 	# Packages that are always backed up
 	if [ -r "$CONFF" ]; then
-		for F in `cat "$CONFF"`; do
-			if [ "$F" != "root" ] && [ "$F" != "local" ]; then
-				PKGS="$PKGS $F"
-			fi
-		done
+	 for F in `cat "$CONFF"`; do
+		if [ "$F" != "root" ] && [ "$F" != "local" ]; then
+		 PKGS="$PKGS $F"
+		fi
+	 done
 	else
-		PKGS="etc modules dhcpd webadmin"
+	 PKGS="etc modules dhcpd webadmin"
 	fi
 	DO_SPECIAL=NO
-fi
+ fi
 
 echo "Backing up your BrazilFW Configuration..."
 echo
 
 MOUNTCMD="mount -t $FSTYPE /dev/boot "
-if qt $MOUNTCMD $MNT ; then
-
+ if qt $MOUNTCMD $MNT ; then
 	# Backup packages
 	for CONF in $PKGS; do
-		if $BACKSCRIPT $CONF $WTMP $CWRT ; then
-			echo "Back-up of $CONF complete"
-		else
-			echo "Unable to back-up $CONF"
-		fi
+	 $BACKSCRIPT $CONF $WTMP $CWRT && echo "Back-up of $CONF complete" || echo "Unable to back-up $CONF"
 	done
-
     	# Copy the coyote configuration file to the floppy
     	echo "Saving configuration files"
 	cat /var/lib/lrpkg/*.config_files | while read f; do
-		f1=`echo $f | cut -f 1 -d " "`
-		f2=`echo $f | cut -f 2 -d " "`
- 	   	cat /etc/coyote/$f2 | dos2unix -d > $MNT/config/$f1
+	 f1=`echo $f | cut -f 1 -d " "`
+	 f2=`echo $f | cut -f 2 -d " "`
+ 	 cat /etc/coyote/$f2 | dos2unix -d > $MNT/config/$f1
 	done
-
     	# Copy the profiles to the floppy
-        rm -rf $MNT/config/profiles/*
+	 rm -rf $MNT/config/profiles/*
 	ls /etc/coyote/profiles/*.prf > /dev/null 2> /dev/null
 	if [ $? = 0 ] ; then
- 	    	echo "Saving profiles"
-		[ ! -e $MNT/config/profiles ] && mkdir $MNT/config/profiles
-		cp /etc/coyote/profiles/*.prf $MNT/config/profiles
+ 	 echo "Saving profiles"
+	 [ ! -e $MNT/config/profiles ] && mkdir $MNT/config/profiles
+	 cp /etc/coyote/profiles/*.prf $MNT/config/profiles
 	fi
-	
     	echo "done."
-
 	# Reset the "config dirty" flag
-	if [ -r /tmp/need.save ]; then
-		rm /tmp/need.save
-	fi
-
-else
+	[ -r /tmp/need.save ] && rm /tmp/need.save
+ else
 	echo "Could not mount boot device."
-fi
-
-sync
-qt umount $MNT
-if [ "$DELAYBACKUP" = "yes" ] ; then
+ fi
+ sync
+ qt umount $MNT
+ if [ "$DELAYBACKUP" = "yes" ] ; then
 	echo "Waiting for flushing usb cache..."
 	sleep 15
-fi
+ fi
 else
-   echo
-   echo "Backup is disabled..."
-   echo 
+ echo
+ echo "Backup is disabled..."
+ echo 
 fi

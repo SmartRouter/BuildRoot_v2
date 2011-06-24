@@ -11,6 +11,11 @@ export TERMINFO='/etc/terminfo'
 
 umask 022
 
+ulimit -c 100000
+ulimit -m 2000
+ulimit -u 128
+ulimit -n 8192
+
 #This fixes the backspace when telnetting in.
 if [ "$TERM" != "linux" ]; then
         stty erase ^H

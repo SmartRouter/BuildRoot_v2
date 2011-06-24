@@ -5,67 +5,95 @@
 # OBS: The root class is 1000
 #      The junk class is 9999
 #      The subnet classes are 1000 + Subnet ID
+# Changed to SP1: without packet mark
+# by BFW user "marcos do vale" - 16/03/2009
 
 . /etc/coyote/coyote.conf
 
 iptables="/usr/sbin/iptables"
 tc="/usr/sbin/tc"
+ip="/bin/ip"
 
-[ "$INETTYPE" = "PPPOE" -o "$INETTYPE" = "PPP" ] && IF_INET=ppp0
+# Debug
+#iptables="echo iptables"
+#tc="echo tc"
+#ip="echo ip"
 
-echo " Iface $IF_INET"
-echo "  Creating Upload Root Class: Rate ${QOS_UPSTREAM}kbit"
-# Create root class # Upload
-$tc qdisc  add dev $IF_INET root          handle  1:     htb default 9999
-$tc class  add dev $IF_INET parent 1:     classid 1:1000 htb rate ${QOS_UPSTREAM}kbit
+$iptables -t mangle -F qos_IMQ 2> /dev/null
+ [ $? != 0 ] && { $iptables -t mangle -N qos_IMQ; $iptables -t mangle -A PREROUTING -j qos_IMQ; }
 
-echo "   Creating Upload Junk Class: Rate ${UPSTREAM_JUNK}kbit"
-$tc class  add dev $IF_INET parent 1:1000 classid 1:9999 htb rate ${UPSTREAM_JUNK}kbit prio 4
-$tc qdisc  add dev $IF_INET parent 1:9999 handle  9999:  sfq perturb 5
-$tc filter add dev $IF_INET parent 1:0    protocol ip prio 4 handle 9999 fw classid 1:9999
+$ip link set imq0 up
 
-#echo "  Creating Download Ingress Class: Rate ${QOS_DOWNSTREAM}kbit"
-#$tc qdisc  del dev $IF_INET ingress 2> /dev/null
-#$tc qdisc  add dev $IF_INET handle ffff: ingress
-#$tc filter add dev $IF_INET parent ffff: protocol ip prio 4 u32 match ip src 0.0.0.0/0 \
-# police rate ${QOS_DOWNSTREAM}kbit burst 8k drop flowid :1
+ echo "  Creating Upload Root Class: Rate 10Mbits - Ceil 100Mbit"
+ $tc qdisc  add dev imq0 root          handle  1:     htb default 9999
+ $tc class  add dev imq0 parent 1:     classid 1:1    htb rate 10mbit ceil 100mbit burst 125000k quantum 1536
 
-#==========================================
-lan_setup() {
- echo " Iface $1"
- echo "  Creating Download Root Class: Rate ${QOS_DOWNSTREAM}kbit"
- $tc qdisc  add dev $1 root          handle 1:      htb default 9999
- $tc class  add dev $1 parent 1:     classid 1:1000 htb rate ${QOS_DOWNSTREAM}kbit
+ echo "   Creating Upload Junk Class: Rate ${UPSTREAM_JUNK}kbit Ceil ${QOS_UPSTREAM}kbit"
+ $tc class  add dev imq0 parent 1:1    classid 1:9999 htb rate ${UPSTREAM_JUNK}kbit ceil ${QOS_UPSTREAM}kbit prio 4 quantum 1536
+ $tc qdisc  add dev imq0 parent 1:9999 handle  9999:  sfq perturb 10
+ $tc filter add dev imq0 parent 1:0    protocol ip prio 4 handle 9999 fw classid 1:9999
 
- echo "   Creating Download Junk Class: Rate ${DOWNSTREAM_JUNK}kbit"
- $tc class  add dev $1 parent 1:1000 classid 1:9999 htb rate ${DOWNSTREAM_JUNK}kbit prio 4
- $tc qdisc  add dev $1 parent 1:9999 handle  9999:  sfq perturb 5
- $tc filter add dev $1 parent 1:0    protocol ip prio 4 handle 9999 fw classid 1:9999
+## UPSTREAM Root qdisc, default class internet traffic to firewall class
+#$tc qdisc add dev $IF_INET root handle 1: htb default 89 r2q 1
+#$tc class add dev $IF_INET parent 1: classid 1:1 htb rate ${QOS_UPSTREAM}kbit burst ${QOS_NUP_BURST}k
 
-# echo "  Creating Upload Ingress Class"
-# $tc qdisc  add dev $1 handle ffff: ingress
-}
+#echo " - upstream junk (default) class: ${UPSTREAM_JUNK}kbps, ceil: ${QOS_UPSTREAM}kbps, burst: ${QOS_SUP_BURST}k"
+#$tc class add dev $IF_INET parent 1:1 classid 1:90 htb prio 2 rate ${UPSTREAM_JUNK}kbit ceil ${QOS_UPSTREAM}kbit burst ${QOS_SUP_BURST}k
+#$tc qdisc add dev $IF_INET parent 1:90 handle 90: sfq perturb 10
 
-lan_setup $IF_LOCAL
-[ -n "$IF_LOCAL2" ] && lan_setup $IF_LOCAL2
-[ -n "$IF_LOCAL3" ] && lan_setup $IF_LOCAL3
-[ -n "$IF_LOCAL4" ] && lan_setup $IF_LOCAL4
-[ -n "$IF_WLAN" ] && lan_setup $IF_WLAN
-[ -n "$IF_DMZ" ] && lan_setup $IF_DMZ
+#echo " - direct fw->inet class: ${UP_FW_STREAM}kbps, ceil: ${QOS_UPSTREAM}kbps, burst: ${QOS_NUP_BURST}k"
+#$tc class add dev $IF_INET parent 1:1 classid 1:89 htb prio 1 rate ${UP_FW_STREAM}kbit ceil ${QOS_UPSTREAM}kbit burst ${QOS_FUP_BURST}k
+#$tc qdisc add dev $IF_INET parent 1:89 handle 89: sfq perturb 10
+
+#$tc filter add dev $IF_INET parent 1:0 protocol ip prio 1 u32 match ip protocol 6 0xff match u8 0x05 0x0f at 0 match u16 0x0000 0xffc0 at 2 match u8 0x10 0xff at 33 flowid 1:89
+#$tc filter add dev $IF_INET parent 1:0 protocol ip prio 1 u32 match ip dst 0.0.0.0/0 flowid 1:89
 
 #==========================================
 find_lan() {
  case "$1" in
-	LAN1)	LAN=$IF_LOCAL;;
-	LAN2)	LAN=$IF_LOCAL2;;
-	LAN3)	LAN=$IF_LOCAL3;;
-	LAN4)	LAN=$IF_LOCAL4;;
-	WLAN)	LAN=$IF_WLAN ;;
-	DMZ)	LAN=$IF_DMZ ;;
-	*)	LAN=$IF_LOCAL;;
+	LAN1)	{ LAN=$IF_LOCAL; CLASS=1000; } ;;
+	LAN2)	{ LAN=$IF_LOCAL2; CLASS=2000; } ;;
+	LAN3)	{ LAN=$IF_LOCAL3; CLASS=3000; } ;;
+	LAN4)	{ LAN=$IF_LOCAL4; CLASS=4000; } ;;
+	*)	{ LAN=$IF_LOCAL; CLASS=1000; } ;;
  esac
 }
 
+#==========================================
+lan_setup() {
+ find_lan $1
+ echo " Iface $1"
+ $iptables -t mangle -A qos_IMQ -i $LAN -j IMQ --todev 0
+
+ echo "  Creating Download Root Class: Rate ${QOS_DOWNSTREAM}kbit"
+ $tc qdisc  add dev $LAN root            handle  1:     htb default 9999
+ $tc class  add dev $LAN parent 1:       classid 1:1000 htb rate ${QOS_DOWNSTREAM}kbit
+
+ if [ ! -z $QOS_ZPH -a $QOS_ZPH -gt 0 ]; then
+  echo "   Creating Download ZPH Class: Rate ${QOS_ZPH}kbit"
+  $tc class  add dev $LAN parent 1:       classid 1:998  htb rate ${QOS_ZPH}kbit
+  $tc class  add dev $LAN parent 1:998    classid 1:9998 htb rate 1kbit ceil ${QOS_ZPH}kbit prio 3
+  $tc qdisc  add dev $LAN parent 1:9998   handle  9998:  sfq perturb 10
+  $tc filter add dev $LAN parent 1:0      protocol ip prio 3 u32 match ip protocol 0x6 0xff match ip tos 0x30 0xff flowid 1:9998
+ fi
+
+ echo "   Creating Download Junk Class: Rate ${DOWNSTREAM_JUNK}kbit"
+ $tc class  add dev $LAN parent 1:1000   classid 1:9999 htb rate ${DOWNSTREAM_JUNK}kbit prio 4 quantum 1536
+ $tc qdisc  add dev $LAN parent 1:9999   handle  9999:  sfq perturb 10
+ $tc filter add dev $LAN parent 1:0      protocol ip prio 4 handle 9999 fw classid 1:9999
+
+ echo "  Creating Upload Root Class: Rate ${QOS_UPSTREAM}kbit"
+ $tc class  add dev imq0 parent 1:1      classid 1:$CLASS htb rate ${QOS_UPSTREAM}kbit prio 1 burst 644k quantum 1536
+ $tc qdisc  add dev imq0 parent 1:$CLASS handle  $CLASS   sfq perturb 10
+ echo " "
+}
+
+lan_setup LAN1
+[ -n "$IF_LOCAL2" ] && lan_setup LAN2
+[ -n "$IF_LOCAL3" ] && lan_setup LAN3
+[ -n "$IF_LOCAL4" ] && lan_setup LAN4
+
+#==========================================
 # Function to create the subnet classes
 subnet() {
  ACTIVE=`echo $1 | tr [A-Z] [a-z]`
@@ -86,27 +114,16 @@ subnet() {
 	echo "  SUBNET $LAN:$LAN_ID - IP $IP/$MASK"
 
 	echo "   Creating Download Class: Rate ${DOWN_RATE}kbit Ceil ${DOWN_CEIL}kbit"
-	$tc class  add dev $LAN parent 1:1000 classid 1:$CID htb rate ${DOWN_RATE}kbit ceil ${DOWN_CEIL}kbit prio 3
-	$tc qdisc  add dev $LAN parent 1:$CID handle  $CID: sfq  perturb 5
-	$tc filter add dev $LAN parent 1:0    protocol ip prio 4 handle  $CID fw classid 1:$CID
-	$iptables -t mangle -A Subnet_qos -s $IP/$MASK -j MARK --set-mark $CID
-
-#	echo "   Creating Upload Ingress Filter: Rate ${UP_CEIL}kbit"
-#	$tc filter add dev $LAN parent ffff: protocol ip prio 5 u32 match ip src $IP/$MASK \
-#	police rate ${UP_CEIL}kbit burst 10k drop flowid :$CID
+	$tc class  add dev $LAN parent 1:1000   classid 1:$CID htb rate ${DOWN_RATE}kbit ceil ${DOWN_CEIL}kbit cburst ${QOS_NDOWN_BURST}k prio 1 quantum 1536
+	$tc qdisc  add dev $LAN parent 1:$CID   handle  $CID:  sfq perturb 10
+	$tc filter add dev $LAN parent 1:0      protocol ip prio 1 u32 match ip dst $IP/$MASK flowid 1:$CID
 
 	echo "   Creating Upload Class: Rate ${UP_RATE}kbit Ceil ${UP_CEIL}kbit"
-	$tc class  add dev $IF_INET  parent 1:1000 classid 1:$CID htb rate ${UP_RATE}kbit ceil ${UP_CEIL}kbit prio 3
-	$tc qdisc  add dev $IF_INET  parent 1:$CID handle  $CID: sfq  perturb 5
-	$tc filter add dev $IF_INET  parent 1:0    protocol ip prio 4 handle  $CID fw  classid 1:$CID
-	$iptables -t mangle -A Subnet_qos -d $IP/$MASK -j MARK --set-mark $CID
-
-	[ "$CONLIMIT" != 0 ] && { echo "     - Building connection limit: $CONLIMIT";
-	$iptables -t mangle -A Subnet_qos -p tcp -s $IP/$MASK -m state ! --state RELATED \
-	-m connlimit --connlimit-above $CONLIMIT --connlimit-mask 32 -j DROP; }
-
+	$tc class  add dev imq0 parent 1:$CLASS classid 1:$CID htb rate ${UP_RATE}kbit ceil ${UP_CEIL}kbit cburst ${QOS_NUP_BURST}k prio 1 quantum 1536
+	$tc qdisc  add dev imq0 parent 1:$CID   handle  $CID:  sfq perturb 10
+	$tc filter add dev imq0 parent 1:0      protocol ip prio 1 u32 match ip src $IP/$MASK flowid 1:$CID
+	echo " "
  fi
 }
 
 . /etc/coyote/subnet.cfg # Process the configuration file
-

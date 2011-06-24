@@ -3,12 +3,25 @@
 # Author: Claudio Roberto Cussuol
 # Changed to support subnet QOS in others LAN interfaces
 # by BFW user "maeliseu" - Revision by BFW user "marcos do vale" - 08/04/2008
+# Edit - Fábio Leandro Janiszevski - fabiosammy - fabiosammy@gmail.com - 31/01/2010      
 
 . /var/http/web-functions
+. /etc/coyote/coyote.conf
+VERIFLOCAL2="teste"
+VERIFLOCAL3="$IF_LOCAL3"
+VERIFLOCAL4="$IF_LOCAL4"
 
 SCRIPT="subnet.cgi"
 FILE="/etc/coyote/subnet.cfg"
-COLOR="row6"
+RELOAD="/etc/rc.d/rc.subnet"
+
+list_lan() {
+ [ ! -z $IF_LOCAL2 ] && echo "<option value=LAN2 `[ "$LAN" = "LAN2" ] && echo selected`>LAN2</option>"
+ [ ! -z $IF_LOCAL3 ] && echo "<option value=LAN3 `[ "$LAN" = "LAN3" ] && echo selected`>LAN3</option>"
+ [ ! -z $IF_LOCAL4 ] && echo "<option value=LAN4 `[ "$LAN" = "LAN4" ] && echo selected`>LAN4</option>" 
+ [ ! -z $IF_WLAN ] && echo "<option value=WLAN `[ "$LAN" = "WLAN" ] && echo selected`>WLAN</option>" 
+ [ ! -z $IF_DMZ ] && echo "<option value=DMZ `[ "$LAN" = "DMZ" ] && echo selected`>DMZ</option>" 
+}
 #==================================
 find_lan() {
  case "$1" in
@@ -20,28 +33,6 @@ find_lan() {
 	DMZ)	LAN="DMZ" ;;
 	*)	LAN="LAN1" ;;
  esac
-}
-#==================================
-output_line() {
- [ "$DACTIVE" = "Yes" ] &&	MyC="row4" ||	MyC="row5"
-cat << CLEOF
-<tr><td class=$MyC>$DACTIVE</td>
-<td class=$COLOR>$ID</td>
-<td class=$COLOR>$IP</td>
-<td class=$COLOR>$MASK</td>
-<td class=$COLOR>$DDHCP</td>
-<td class=$COLOR>$DQOS</td>
-<td class=$COLOR nowrap>$DDOWN_RATE</td>
-<td class=$COLOR nowrap>$DDOWN_CEIL</td>
-<td class=$COLOR nowrap>$DUP_RATE</td>
-<td class=$COLOR nowrap>$DUP_CEIL</td>
-<td class=$COLOR>$LAN</td>
-<td class=$COLOR>$LAN_ID</td>
-<td class=$COLOR nowrap>$CONLIMIT</td>
-<td class=$COLOR nowrap>$DCOMMENT</td>
-<td class=$COLOR nowrap><a href=$SCRIPT?ACTION=CALL_EDIT&LINE=$LINECOUNT>&nbsp;[$Faf]&nbsp;</a><a href=$SCRIPT?ACTION=DELETE&LINE=$LINECOUNT>&nbsp;[$Fae]&nbsp;</a></td></tr>
-CLEOF
- [ "$COLOR" = "row6" ] && COLOR="row8" || COLOR="row6"
 }
 #==================================
 treat_rate() {
@@ -125,103 +116,87 @@ mount_configuration() {
  CONFIG_LINE="subnet $FORM_ACTIVE $FORM_ID $FORM_IP $FORM_MASK $FORM_DHCP $FORM_QOS $DOWN_RATE $DOWN_CEIL $UP_RATE $UP_CEIL $FORM_LAN  $FORM_LAN_ID $FORM_CONLIMIT #$FORM_COMMENT"
 }
 #==================================
-show_list() { #<td align="center"><b>Line#</td>
-cat << CLEOF
-<table class=maintable border=0 width="100%"><tr><th colspan=15>$Psg</th></tr>
-<tr><td class=header>$Faj</td>
-<td class=header>$Psh</td>
-<td class=header>$Aip</td>
-<td class=header>$Anm</td>
-<td class=header>$Psi</td>
-<td class=header>$Psj</td>
-<td class=header>$Phi</td>
-<td class=header>$Phj</td>
-<td class=header>$Phk</td>
-<td class=header>$Phl</td>
-<td class=header>LAN</td>
-<td class=header>LAN ID</td>
-<td class=header>CONN LIMIT</td>
-<td class=header>$Fad</td>
-<td class=header>$Fac</td></tr>
-CLEOF
-LINECOUNT=0
-cat $FILE | tr [\\] [\|] | while read TMPLINE; do
- LINECOUNT=$(($LINECOUNT+1))
- case "$TMPLINE" in
-	\#*|"") continue;;
-	 subnet*) { treat_line $TMPLINE; output_line; };;
- esac
-done
-cat << CLEOF
-</table><br>
-<table class=maintable>
-<tr><td class=row1><b>$Pid</b></td><td class=row2>[ &nbsp;<a href=$SCRIPT?ACTION=CALL_ADD><u>$Psl</u></a>&nbsp; | &nbsp;
-<a href="editconf.cgi?CONFFILE=$FILE&DESCFILE=Subnet Configuration File"><u>$Psm</u></a>&nbsp;  | &nbsp;
-<a href=$SCRIPT?ACTION=RELOAD><u>Reload</u></a>&nbsp ]</td></tr>
-</table></form>
-CLEOF
+show_list() { 
+ init_table "maintable"
+ init_add_control "$Pid"
+ add_control "$SCRIPT?ACTION=CALL_ADD" "$Psl"
+ add_control "editconf.cgi?CONFFILE=$FILE&DESCFILE=Subnet Configuration File" "$Psm"
+ add_control "$SCRIPT?ACTION=RELOAD" "Reload"
+ end_add_control
+ end_table
+ echo "<br>"
+ init_main_table
+ add_title "$Psg" "14"
+ header_table "$Faj" "$Psh" "$Aip" "$Anm" "$Psi" "$Psj" "$Phi" "$Phj" "$Phk" "$Phl" "LAN" "LAN ID" "CONN LIMIT" "$Fad"
+ LINECOUNT=0
+ awk -vFye=$Fye -vFno=$Fno -vPha=${Pha// /_} -vPhb=${Phb// /_} -vPhc=${Phc// /_} -vPhd=${Phd// /_} '{
+	if ( substr($11,1,1) == "#" ){
+	 LAN="LAN1";
+	 LAN_ID=$3;
+	 CONLIMIT=0;
+	 COMMENT = substr($11,2)" "$12" "$13" "$14" "$15" "$16" "$17" "$18" "$19" "$20" "$21" "$22" "$23" "$24" "$25" "$26" "$27" "$28" "$29;   
+	} else {
+	 LAN=$12
+	 LAN_ID=$13
+	 CONLIMIT=$14;
+	}
+	if ( substr($14,1,1) == "#" ){
+	 COMMENT = substr($14,2)" "$15" "$16" "$17" "$18" "$19" "$20" "$21" "$22" "$23" "$24" "$25" "$26" "$27" "$28" "$29;
+	 CONLIMIT=0;
+	} else {
+	 COMMENT = substr($15,2)" "$16" "$17" "$18" "$19" "$20" "$21" "$22" "$23" "$24" "$25" "$26" "$27" "$28" "$29;
+	 CONLIMIT=$14;
+	}
+	{ if ( $2 == "y" ) { ACTIVE=Fye } else if ( $2 == "n" ) { ACTIVE=Fno } }
+	{ if ( $6 == "y" ) { DHCP=Fye } else if ( $6 == "n" ) { DHCP=Fno } }
+	{ if ( $7 == "y" ) { QOS=Fye } else if ( $7 == "n" ) { QOS=Fno } }
+	{ if ( $8 == "$COMP_DOWN" ) { DOWN_RATE = Pha } else if ( $8 == "$CLEAR_DOWNSTREAM" ) { DOWN_RATE = Phc } else { DOWN_RATE = $8"_kbits/s" } }
+	{ if ( $9 == "$CLEAR_DOWNSTREAM" ) { DOWN_CEIL = Phc } else if ( $9 == "$COMP_DOWN" ) { DOWN_CEIL = Pha } else { DOWN_CEIL = $9"_kbits/s" } }
+	{ if ( $10 == "$COMP_UP" ) { UP_RATE = Phb } else if ( $10 == "$CLEAR_UPSTREAM" ) { UP_RATE = Phd } else { UP_RATE = $10"_kbits/s" } }
+	{ if ( $11 == "$CLEAR_UPSTREAM" ) { UP_CEIL = Phd } else if ( $11 == "$COMP_UP" ) { UP_CEIL = Phb } else { UP_CEIL = $11"_kbits/s" } }
+	}
+	{print $1" "ACTIVE" "$3" "$4" "$5" "DHCP" "QOS" "DOWN_RATE" "DOWN_CEIL" "UP_RATE" "UP_CEIL" "LAN" "LAN_ID" "CONLIMIT" "COMMENT}' $FILE | 
+	while read FIRST DACTIVE ID IP MASK DDHCP DQOS DDOWN_RATE DDOWN_CEIL DUP_RATE DUP_CEIL LAN LAN_ID CONLIMIT DCOMMENT ; do
+	 LINECOUNT=$(($LINECOUNT+1))
+	 find_lan $LAN
+	 case "$FIRST" in
+		subnet*) output_line "$DACTIVE" "$ID" "$IP" "$MASK" "$DDHCP" "$DQOS" "${DDOWN_RATE//_/ }" "${DDOWN_CEIL//_/ }" "${DUP_RATE//_/ }" "${DUP_CEIL//_/ }" "$LAN" "$LAN_ID" "$CONLIMIT" "$DCOMMENT";;
+	 esac
+ done
+ end_table
 }
 #==================================
 show_form() {
-FORMTITLE="$Psg"
-if [ -z "$ID" ]; then
- LASTLINE=`grep subnet $FILE | tail -n 1`
- [ -n "$LASTLINE" ] && treat_line $LASTLINE
- ID=$(($LASTID+1))
- IP=
-fi
-[ -z "$DOWN_RATE" ] && NDOWN_RATE='' && SDOWN_RATE='Individual Download'
-[ -z "$DOWN_CEIL" ] && NDOWN_CEIL='' && SDOWN_CEIL='Total Download'
-[ -z "$UP_RATE" ] && NUP_RATE='' && SUP_RATE='Individual Upload'
-[ -z "$UP_CEIL" ] && NUP_CEIL='' && SUP_CEIL='Total Upload'
-cat << CLEOF
-<form method="POST" action="$SCRIPT">
-<input type=hidden value="$LINE" name=LINE>
-<input type=hidden value="$ACTION" name=ACTION>
-<table class=maintable width=100%><tr><th colspan=2>$FORMTITLE</th></tr>
-<tr><td class=row1 align=right><b>$Paz</b><br>$Pba</td>
-    <td class=row2><input type=radio value=n name=ACTIVE `[ "$ACTIVE" = "n" ] && echo checked`>$Fno &nbsp;<input type=radio value=y name=ACTIVE `[ "$ACTIVE" != "n" ] && echo checked`>$Fye</td></tr>
-<tr><td class=row1 align=right><b>$Psh</b><br><small>$Psn</small></td>
-    <td class=row2><input type=text name=ID value="$ID" size=5></td></tr>
-<tr><td class=row1 align=right><b>$Aip</b><br><small>$Pso</small></td>
-    <td class=row2><input type=text name=IP value="$IP" size=20></td></tr>
-<tr><td class=row1 align=right><b>$Anm</b><br><small>$Psp</small></td>
-    <td class=row2><input type=text name=MASK value="$MASK" size=20></td></tr>
-<tr><td class=row1 align=right><b>$Psi</b><br>$Psq</td>
-    <td class=row2><input type=radio value=n name=DHCP `[ "$DHCP" = "n" ] && echo checked`>$Fno &nbsp;<input type=radio value=y name=DHCP `[ "$DHCP" != "n" ] && echo checked`>$Fye</td></tr>
-<tr><td class=row1 align=right><b>$Psj</b><br>$Psr</td>
-    <td class=row2><input type=radio value=n name=QOS `[ "$QOS" = "n" ] && echo checked`>$Fno &nbsp;<input type=radio value=y name=QOS `[ "$QOS" != "n" ] && echo checked`>$Fye</td></tr>
-<tr><td class=row1 align=right><b>$Phi</b><br><small>$Phv  $Phw</small></td><td class=row2><input type=text name=NDOWN_RATE value="$NDOWN_RATE" size=4>&nbsp; kbits/s $Far<br>
- <select name=SDOWN_RATE><option value></option><option value='COMP_DOWN' `[ "$SDOWN_RATE" = "Individual Download" ] && echo selected`>$Phx</option>
- <option value='CLEAR_DOWNSTREAM' `[ "$SDOWN_RATE" = "Total Download" ] && echo selected`>$Phy</option></select></td></tr>
-<tr><td class=row1 align=right><b>$Phj</b><br><small>$Phz  $Phw</small></td><td class=row2><input type=text name=NDOWN_CEIL value="$NDOWN_CEIL" size=4>&nbsp; kbits/s $Far<br>
- <select name=SDOWN_CEIL><option value></option><option value='COMP_DOWN' `[ "$SDOWN_CEIL" = "Individual Download" ] && echo selected`>$Phx</option>
- <option value='CLEAR_DOWNSTREAM' `[ "$SDOWN_CEIL" = "Total Download" ] && echo selected`>$Phy</option></select></td></tr>
-<tr><td class=row1 align=right><b>$Phk</b><br><small>$Phv  $Phw</small></td><td class=row2><input type=text name=NUP_RATE value="$NUP_RATE" size=4>&nbsp; kbits/s $Far<br>
- <select name=SUP_RATE><option value></option><option value='COMP_UP' `[ "$SUP_RATE" = "Individual Upload" ] && echo selected`>$Phb</option>
- <option value='CLEAR_UPSTREAM' `[ "$SUP_RATE" = "Total Upload" ] && echo selected`>$Phd</option></select></td></tr>
-<tr><td class=row1 align=right><b>$Phl</b><br><small>$Phz  $Phw</small></td><td class=row2><input type=text name=NUP_CEIL value="$NUP_CEIL" size=4>&nbsp; kbits/s $Far<br>
- <select name=SUP_CEIL><option value></option><option value='COMP_UP' `[ "$SUP_CEIL" = "Individual Upload" ] && echo selected`>$Phb</option>
- <option value='CLEAR_UPSTREAM' `[ "$SUP_CEIL" = "Total Upload" ] && echo selected`>$Phd</option></select></td></tr>
-<tr><td class=row1 align=right><b>LAN</b><br><small></small></td>
-    <td class=row2><select name=LAN>
-     <option value=LAN1 `[ "$LAN" = "LAN1" ] && echo selected`>LAN1</option>
-CLEOF
- [ ! -z $IF_LOCAL2 ] && echo "<option value=LAN2 `[ "$LAN" = "LAN2" ] && echo selected`>LAN2</option>"
- [ ! -z $IF_LOCAL3 ] && echo "<option value=LAN3 `[ "$LAN" = "LAN3" ] && echo selected`>LAN3</option>"
- [ ! -z $IF_LOCAL4 ] && echo "<option value=LAN4 `[ "$LAN" = "LAN4" ] && echo selected`>LAN4</option>"
- [ ! -z $IF_WLAN ] && echo "<option value=WLAN `[ "$LAN" = "WLAN" ] && echo selected`>WLAN</option>"
- [ ! -z $IF_DMZ ] && echo "<option value=DMZ `[ "$LAN" = "DMZ" ] && echo selected`>DMZ</option>"
-cat << CLEOF
-</select></td></tr>
-<tr><td class=row1 align=right><b>ID da LAN</b><br><small></small></td>
-    <td class=row2><input type=text name=LAN_ID value="$LAN_ID" size=5></td></tr>
-<tr><td class=row1 align=right><b>CONLIMIT</b><br><small></small></td>
-    <td class=row2><input type=text name=CONLIMIT value="$CONLIMIT" size=5></td></tr>
-<tr><td class=row1 align=right><b>$Fad ($Fop)</b><br><small>$Pss</small></td><td class=row2><input type=text name=COMMENT value="$COMMENT" size=30></td></tr>
-</table><p align=center><input type=submit value="$Fsb" name=OKBTN>&nbsp;<input type=reset value="$Fer"></p>
-</form>
-CLEOF
+ if [ -z "$ID" ]; then
+	LASTLINE=`grep subnet $FILE | tail -n 1`
+	[ -n "$LASTLINE" ] && treat_line $LASTLINE
+	ID=$(($LASTID+1))
+	IP=
+ fi
+ CONLIMIT=0
+ [ -z "$DOWN_RATE" ] && NDOWN_RATE='' && SDOWN_RATE='Individual Download'
+ [ -z "$DOWN_CEIL" ] && NDOWN_CEIL='' && SDOWN_CEIL='Total Download'
+ [ -z "$UP_RATE" ] && NUP_RATE='' && SUP_RATE='Individual Upload'
+ [ -z "$UP_CEIL" ] && NUP_CEIL='' && SUP_CEIL='Total Upload'
+ init_form
+ init_main_table
+ add_title "$Psg"
+ form_info_item "$Paz" "$Pba" "$(input_radio "ACTIVE" "n" "$Fno" "`[ "$ACTIVE" = "n" ] && echo checked`")$(input_radio "ACTIVE" "y" "$Fye" "`[ "$ACTIVE" != "n" ] && echo checked`")"
+ form_info_item "$Psh" "$Psn" "$(input_text "ID" "$ID" "5")"
+ form_info_item "$Aip" "$Pso" "$(input_text "IP" "$IP" "20")"
+ form_info_item "$Anm" "$Psp" "$(input_text "MASK" "$MASK" "20")"
+ form_info_item "$Psi" "$Psq" "$(input_radio "DHCP" "n" "$Fno" "`[ "$DHCP" = "n" ] && echo checked`") $(input_radio "DHCP" "y" "$Fye" "`[ "$DHCP" != "n" ] && echo checked`")"
+ form_info_item "$Psj" "$Psr" "$(input_radio "QOS" "n" "$Fno" "`[ "$QOS" = "n" ] && echo checked`") $(input_radio "QOS" "y" "$Fye" "`[ "$QOS" != "n" ] && echo checked`")"
+ form_info_item "$Phi" "$Phv  $Phw" "$(input_text "NDOWN_RATE" "$NDOWN_RATE" "4") kbits/s $Far<br> $(init_combobox "SDOWN_RATE") $(add_item_combobox "" "" "") $(add_item_combobox "'COMP_DOWN'" "$Phx" "`[ "$SDOWN_RATE" = \"Individual Download\" ] && echo selected`")$(add_item_combobox "'CLEAR_DOWNSTREAM'" "$Phy" "`[ "$SDOWN_RATE" = \"Total Download\" ] && echo selected`") $(end_combobox)" 
+ form_info_item "$Phj" "$Phz  $Phw" "$(input_text "NDOWN_CEIL" "$NDOWN_CEIL" "4") kbits/s $Far<br> $(init_combobox "SDOWN_CEIL") $(add_item_combobox "" "" "") $(add_item_combobox "'COMP_DOWN'" "$Phx" "`[ "$SDOWN_CEIL" = \"Individual Download\" ] && echo selected`")$(add_item_combobox "'CLEAR_DOWNSTREAM'" "$Phy" "`[ "$SDOWN_CEIL" = \"Total Download\" ] && echo selected`") $(end_combobox)" 
+ form_info_item "$Phk" "$Phv  $Phw" "$(input_text "NUP_RATE" "$NUP_RATE" "4") kbits/s $Far<br> $(init_combobox "SUP_RATE") $(add_item_combobox "" "" "") $(add_item_combobox "'COMP_UP'" "$Phb" "`[ "$SUP_RATE" = \"Individual Upload\" ] && echo selected`")$(add_item_combobox "'CLEAR_UPSTREAM'" "$Phd" "`[ "$SUP_RATE" = \"Total Upload\" ] && echo selected`") $(end_combobox)" 
+ form_info_item "$Phl" "$Phz  $Phw" "$(input_text "NUP_CEIL" "$NUP_CEIL" "4") kbits/s $Far<br> $(init_combobox "SUP_CEIL") $(add_item_combobox "" "" "") $(add_item_combobox "'COMP_UP'" "$Phb" "`[ "$SUP_CEIL" = \"Individual Upload\" ] && echo selected`")$(add_item_combobox "'CLEAR_UPSTREAM'" "$Phd" "`[ "$SUP_CEIL" = \"Total Upload\" ] && echo selected`") $(end_combobox)" 
+ form_info_item "LAN" " " "$(init_combobox "LAN") $(add_item_combobox "LAN1" "LAN1" "`[ "$LAN" = "LAN1" ] && echo selected`") $(list_lan) $(end_combobox)"
+ form_info_item "ID da LAN" " " "$(input_text "LAN_ID" "$LAN_ID" "5")"
+ form_info_item "CONLIMIT" " " "$(input_text "CONLIMIT" "$CONLIMIT" "5")"
+ form_info_item "$Fad ($Fop)" "$Pss" "$(input_text "COMMENT" "$COMMENT" "30")"
+ end_table
+ end_form
 }
 #==================================
 # MAIN ROUTINE
@@ -229,21 +204,15 @@ cl_header2 "$Psg - BrazilFW"
 if [ "$FORM_OKBTN" = "$Fsb" ]; then
  mount_configuration
  if [ -n "$CONFIG_LINE" ]; then
-	[ "$FORM_ACTION" = "ADD" ] && echo -e "$CONFIG_LINE" >> $FILE \
-	|| sed -i "$FORM_LINE"s/.*/"$CONFIG_LINE"/ $FILE
-	echo "<center><div id=alerta>$Pst<br>
-	$Wsv<br>
-	<a href=backup.cgi class=links>$Wtl</a></div><br>
-	<div id=back><a href=$SCRIPT?ACTION=RELOAD class=links>$Psv</a><br></div><br></center>"
+	[ "$FORM_ACTION" = "ADD" ] && addline "$CONFIG_LINE" $FILE || changeline $FORM_LINE "$CONFIG_LINE" $FILE
+	alert "$Pst" "$Psv"
  fi
 fi
 
 case "$FORM_ACTION" in
  "DELETE")
-	sed -i "$FORM_LINE"d $FILE
-	echo "<center><div>$Psu<br>"
-	echo "<a>$Wtl</a><br>"
-	echo "<a>$Psv</a></div></center><br>"
+	deleteline "$FORM_LINE" $FILE
+	alert "$Psu" "$Psv"
 	show_list
  ;;
  "CALL_EDIT")
@@ -259,14 +228,7 @@ case "$FORM_ACTION" in
 	LINE=0
 	show_form
  ;;
- "RELOAD")
-	echo "<br><pre>"
-	/etc/rc.d/rc.subnet
-	echo "</pre><center><div id=\"back\">[ <a href=$SCRIPT class=links><u>$Fbl</u></a> ]</div></center>"
- ;;
- *)
-	show_list
- ;;
+ "RELOAD") command_reload;;
+ *) show_list;;
 esac
 cl_footer2
-

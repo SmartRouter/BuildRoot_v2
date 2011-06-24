@@ -370,7 +370,7 @@ if [ "$format" = "yes" ] ; then
   if [ "$use_cache" = "yes" ] ; then
     echo
     echo Creating Linux file system on second partition...
-    /bin/mke2fs -q -F -m 0 -s 1 $partition_cache
+    /bin/mke2fs -q -F -m 0 -s 1 -i 8192 -b 4096 $partition_cache
     if [ "$?" != 0 ] ; then
       echo "Error Creating LINUX file system on second partition"
       abort
@@ -443,7 +443,7 @@ if [ "$use_cache" = "yes" ] ; then
 
   echo
   echo Creating Linux journaling on second partition ...
-  /bin/tune2fs -c 0 -i 0 -j -O dir_index $partition_cache
+  /bin/tune2fs -c 0 -i 0 -j -O dir_index,has_journal -o journal_data_writeback $partition_cache
   if [ "$?" != 0 ] ; then
     echo "Error Creating Linux journaling on second partition ..."
     abort

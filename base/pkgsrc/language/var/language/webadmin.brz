@@ -689,6 +689,7 @@ Baq="Log Conexôes Saindo"
 Bar="Modo de Depuração (Log cada comando do firewall)"
 Bas="Tamanho Máximo da Tabela de Conexões (Não Recomendado)"
 Bat="Desabilita a Linguagem Nativa (Use Inglês)"
+Bau="Tempo para desligamento dos discos em minutos (0=desativa)"
 
 # file sfirewall.cgi
 Pns="Filtragem de Protocols Level 7"

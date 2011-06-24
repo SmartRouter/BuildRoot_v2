@@ -8,14 +8,10 @@
 # Source the coyote linux configuration file
 . /etc/coyote/coyote.conf
 
-if [ -f /var/run/ppp0.pid ]; then
-        PID=`cat /var/run/ppp0.pid`      
-	if [ "$INETTYPE" = "PPP" ] ; then
-	       	kill -HUP $PID
-	else
-		kill $PID
-	fi		       	
+PID=`pidof pppd` 
+if [ ! -z $PID ]; then  
+	[ "$INETTYPE" = "PPP" ] && kill -HUP $PID || kill $PID
 	echo "Sent SIGHUP to pppd ($PID)"
 else
-        echo "pppd not running"
+	echo "pppd not running"
 fi

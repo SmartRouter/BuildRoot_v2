@@ -1,8 +1,12 @@
 #!/bin/sh
 # Coyote Masquerading Startup Script
 #	called by: /etc/rc.d/rc.firewall
+# Revision by BFW user "marcos do vale" - 10/09/2007
 # Changed to support others LAN interfaces
-# by BFW user "marcos do vale" - 10/09/2007
+# by BFW user "marcos do vale"
+# Revision by BFW user "marcos do vale" - 19/10/2008
+# Del lines 44 and 45 (DMZ network calc)
+
 # Expects the external (Internet) interface to be passed as the first parameter
 #
 # Sintaxe:
@@ -41,9 +45,6 @@ masquerade() {
 eval `ipcalc -n $LOCAL_IPADDR $LOCAL_NETMASK`
 LOCAL_NETWORK=$NETWORK
 
-[ -n "$DMZ_IPADDR" ] && \
-  { eval `ipcalc -n $DMZ_IPADDR $DMZ_NETMASK`; DMZ_NETWORK=$NETWORK; }
-
 iptables -t nat -I nat-masks -s $LOCAL_NETWORK/$LOCAL_NETMASK -o $IF_INET -j MASQUERADE
 [ -n "$INET2_IPADDR" ] && iptables -t nat -I nat-masks -s $LOCAL_NETWORK/$LOCAL_NETMASK -o $IF_INET2 -j MASQUERADE
 [ -n "$INET3_IPADDR" ] && iptables -t nat -I nat-masks -s $LOCAL_NETWORK/$LOCAL_NETMASK -o $IF_INET3 -j MASQUERADE
@@ -60,7 +61,7 @@ fi
 
 [ ! -z $LOCAL2_IPADDR ] && masquerade $LOCAL2_IPADDR $LOCAL2_NETMASK
 [ ! -z $LOCAL3_IPADDR ] && masquerade $LOCAL3_IPADDR $LOCAL3_NETMASK
-[ ! -z $LOCAL4_IPADDR ] && masquerade $LOCAL4_IPADDR $LOCAL2_NETMASK
+[ ! -z $LOCAL4_IPADDR ] && masquerade $LOCAL4_IPADDR $LOCAL4_NETMASK
 [ ! -z $WLAN_IPADDR ] && masquerade $WLAN_IPADDR $WLAN_NETMASK
 
 # Flush the iptables rules associated with port forwarding

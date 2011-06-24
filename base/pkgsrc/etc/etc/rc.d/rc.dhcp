@@ -25,16 +25,16 @@ rm /etc/dhcpc/$IF_INET.info 1> /dev/null 2> /dev/null
 # Configure the interface
 ip link set $IF_INET up   #Just to check if nic is ok.
 if [ ! $? = 0 ]; then
-   INET_UP=DOWN
-   echo "The Internet Network Interface Card was not set properly"
-   logger "The Internet Network Interface Card was not set properly"
+ INET_UP=DOWN
+ echo "The Internet Network Interface Card was not set properly"
+ logger "The Internet Network Interface Card was not set properly"
 else
-   udhcpc $DHCPCDOPTIONS &
-   if [ ! $? = 0 ]; then
-  	INET_UP=DOWN
-        echo "The DHCP client daemon not started properly"
-        logger "The DHCP client daemon not started properly"
-   else
+ udhcpc $DHCPCDOPTIONS &
+ if [ ! $? = 0 ]; then
+	INET_UP=DOWN
+	echo "The DHCP client daemon not started properly"
+	logger "The DHCP client daemon not started properly"
+ else
 	INET_UP=READY
-   fi
+ fi
 fi   

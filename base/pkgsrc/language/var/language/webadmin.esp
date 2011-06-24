@@ -679,8 +679,10 @@ Pqr="Eg: Para recargar el firewall escriba: firewall.reload"
 Pqs="Su tarea programada se agregó correctamente."
 Pqt="Su tarea programada se borró correctamente."
 Pqu="Necesita recargar el proceso Cron para aplicar los cambios."
+
 #file editconf.cgi
 Pjv="Tareas programadas"
+
 # file adminconf.cgi
 Ban="Habilitar el proceso de tareas programadas (Cron)"
 Bao="Log de intentos de conexión externa"
@@ -689,6 +691,8 @@ Baq="Log accesos salientes"
 Bar="Modo Debug (Log cada comando firewall)"
 Bas="Tamaño máximo de tabla Conntrack (No Recomendado)"
 Bat="Deshabilitar lenguaje nativo (Usar Inglés)"
+Bau="De tiempo para apagado automático del disco duro en cuestión de minutos (0 = off)"
+
 # file sfirewall.cgi
 Pns="Filtrado de protocolos Level 7"
 Pnt="Liste los nombres de protocolos que quiere bloquear."

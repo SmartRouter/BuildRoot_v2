@@ -12,6 +12,7 @@ if [ "$FORM_OKBTN" = "$Fsb" ]; then
 	DMZ_NETMASK2=$FORM_NETMASK2
 	DMZ_NETMASK3=$FORM_NETMASK3
 	cl_rebuildconf
+. /usr/sbin/write_state.sh
         echo "<center><div id=alerta>BrazilFW - $Lyn<br>$Wtc</div></center>"
 else
 cat << CLEOF

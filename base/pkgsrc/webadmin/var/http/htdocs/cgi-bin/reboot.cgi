@@ -2,23 +2,19 @@
 . /var/http/web-functions
 cl_header2 "$Mpc - BrazilFW"
 case "$FORM_OKBTN" in
-	"$Wqo")
-		echo "$Wrb ...<br>"
-                echo "</body></html>"
-		/usr/sbin/hangup.and.reboot
-		exit 0
-		;;
-	"$Wso")
-		echo "$Wpo ...<br></body></html>"
-		/sbin/poweroff
-		exit 0
-		;;
-	*)
-if [ -r /tmp/need.save ]; then
-	WARN_MSG="<center><b>$Wtd $Wsi</b></center>"
-else
-	WARN_MSG=
-fi
+ "$Wqo")
+	echo "$Wrb ...<br>"
+	echo "</body></html>"
+	/usr/sbin/hangup.and.reboot>/dev/tty0
+	exit 0
+	;;
+ "$Wso")
+	echo "$Wpo ...<br></body></html>"
+	poweroff > /dev/tty0
+	exit 0
+	;;
+ *)
+	[ -r /tmp/need.save ] && WARN_MSG="<center><b>$Wtd $Wsi</b></center>" || WARN_MSG=
 cat << CLEOF
 <center><form method="POST" action="/cgi-bin/reboot.cgi">${WARN_MSG}<br>
 <table class=maintable border=0 width=400>
@@ -29,5 +25,4 @@ cat << CLEOF
 CLEOF
 	;;
 esac
-
 cl_footer2

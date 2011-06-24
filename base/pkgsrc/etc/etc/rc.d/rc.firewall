@@ -242,14 +242,14 @@ esac
 
 set_access() {
 	[ $DEBUG = 1 ] && logger $FWDRULE
-        if [ $# -lt 7 ]; then
+	if [ $# -lt 7 ]; then
 		echo "   Invalid access entry rule line# $LINE in /etc/coyote/firewall"
 		return 1
 	fi
 
-        if [ "$2" = "y" ]; then
-        	# Rule Option
-        	RULE=
+       if [ "$2" = "y" ]; then
+		# Rule Option
+		RULE=
 		if [ "$3" = "permit" ]; then
 			RULE=ACCEPT
 		elif [ "$3" = "deny" ]; then
@@ -282,7 +282,7 @@ set_access() {
         	elif [ "$TAG" = mac ]; then
         		SRCTAG="$TAG"
         		SRCOPT="--match mac --mac-source $ADDRESS"
-		elif [ "$SRC" = "lan-if" -o "$SRC" = "int-if" -o "$SRC" = "dmz-if" -o "$SRC" = "local2-if" -o "$SRC"  = "local3-if" -o "$SRC"  = "local4-if" -o "$SRC" = "wlan-if" -o "$SRC" = "int2-if" -o "$SRC" = "int3-if" -o "$SRC" = "wan2-if" -o "$SRC" = "wan3-if" -o "$SRC" = "wan4-if" ]; then
+		elif [ "$SRC" = "lan-if" -o "$SRC" = "int-if" -o "$SRC" = "dmz-if" -o "$SRC" = "local2-if" -o "$SRC" = "local3-if" -o "$SRC" = "local4-if" -o "$SRC" = "wlan-if" -o "$SRC" = "wan2-if" -o "$SRC" = "wan3-if" -o "$SRC" = "wan4-if" ]; then
         		SRCOPT="-i $ADDRESS"
         	else
 	        	SRCOPT="-s $ADDRESS"
@@ -300,7 +300,7 @@ set_access() {
         	elif [ "$TAG" = mac ]; then
         		DESTTAG="$TAG"
         		DSTOPT="--match mac --mac-source $ADDRESS"
-        	elif [ "$DEST" = "lan-if" -o "$DEST" = "int-if" -o "$DEST" = "dmz-if" -o "$DEST" = "local2-if" -o "$DEST"  = "local3-if" -o "$DEST"  = "local4-if" -o "$DEST" = "wlan-if" -o "$DEST" = "int2-if" -o "$DEST" = "int3-if" -o "$DEST" = "wan2-if" -o "$DEST" = "wan3-if" -o "$DEST" = "wan4-if" ]; then
+        	elif [ "$DEST" = "lan-if" -o "$DEST" = "int-if" -o "$DEST" = "dmz-if" -o "$DEST" = "local2-if" -o "$DEST" = "local3-if" -o "$DEST" = "local4-if" -o "$DEST" = "wlan-if" -o "$DEST" = "wan2-if" -o "$DEST" = "wan3-if" -o "$DEST" = "wan4-if" ]; then
         		DSTOPT="-o $ADDRESS"
         	else
         		DSTOPT="-d $ADDRESS"
@@ -450,7 +450,7 @@ allow_port() {
 		fi
 	 ;;
 	esac
-	COMMAND="iptables -A port-filter -p $PROTO $PORTOPT -j ACCEPT"
+	COMMAND="iptables -A port-filter -p $PROTO $PORTOPT -j RETURN"
 	$COMMAND
 	[ $DEBUG = 1 ] && logger "$COMMAND"
  fi
@@ -466,7 +466,7 @@ block_protocol() {
 #Set permission to access dhcp server when policy is block all users
 
 if [ "$DEFAULT_USERS_FILTER" = "BLOCK_ALL" -a "$DHCPSERVER" = "YES" ] ; then
- COMMAND="iptables -I user-filter -p udp --dport 67 -j RETURN"
+ COMMAND="iptables -I user-filter -p udp --dport 67:68 --sport 67:68 -j RETURN"
  $COMMAND
  [ $DEBUG = 1 ] && logger "$COMMAND"
 fi
@@ -516,6 +516,7 @@ fi
 
 blk_lan() {
  COMMAND="iptables -A $1 -i $2 -j DROP"
+# COMMAND="iptables -A $1 -i $2 -j REJECT"
  $COMMAND
  [ $DEBUG = 1 ] && logger "$COMMAND"
 }
@@ -523,9 +524,7 @@ blk_lan() {
 #Set default policies to Simplified Firewall
 if [ "$DEFAULT_USERS_FILTER" = "BLOCK_ALL" ] ; then
  [ $DEBUG = 1 ] && DEFAULT_USERS_FILTER=BLOCK_ALL
- COMMAND="iptables -A user-filter -i $IF_LOCAL  -j DROP"
- $COMMAND
- [ $DEBUG = 1 ] && logger "$COMMAND"
+ blk_lan user-filter $IF_LOCAL
  [ ! -z $LOCAL2_IPADDR ] && blk_lan user-filter $IF_LOCAL2
  [ ! -z $LOCAL3_IPADDR ] && blk_lan user-filter $IF_LOCAL3
  [ ! -z $LOCAL4_IPADDR ] && blk_lan user-filter $IF_LOCAL4
@@ -533,9 +532,7 @@ if [ "$DEFAULT_USERS_FILTER" = "BLOCK_ALL" ] ; then
 fi
 if [ "$DEFAULT_SERVICES_FILTER" = "BLOCK_ALL" ] ; then
  [ $DEBUG = 1 ] && DEFAULT_SERVICES_FILTER=BLOCK_ALL
- COMMAND="iptables -A port-filter -i $IF_LOCAL -j DROP"
- $COMMAND
- [ $DEBUG = 1 ] && logger "$COMMAND"
+ blk_lan port-filter $IF_LOCAL
  [ ! -z $LOCAL2_IPADDR ] && blk_lan port-filter $IF_LOCAL2
  [ ! -z $LOCAL3_IPADDR ] && blk_lan port-filter $IF_LOCAL3
  [ ! -z $LOCAL4_IPADDR ] && blk_lan port-filter $IF_LOCAL4
@@ -561,23 +558,29 @@ if [ ! -z "$FILES" ]; then
  done
 fi
 
+start_ntpclient() {
+# /usr/sbin/ntpclient -p 123 -g 1 -h ${TIMESERVER} -s & 1>/dev/null 2>&1
+ /usr/sbin/ntpclient -c 1 -p 123 -g 1 -h ${TIMESERVER} -s 0<&- 1>/dev/null 2>&1 &
+ [ $? = 0 ] && { echo -e "Success."; logger "Success."; return 0; } || { echo -e "Failed!"; logger "Failed!"; return 1; }
+}
+
+set_biosclock() {
+ echo "Set the bios clock using timeserver"
+ logger "Set the bios clock using timeserver"
+ [ -e /var/state/adjtime ] && rm -rf /var/state/adjtime
+ /sbin/hwclock -w -l >/dev/null
+}
+
 if [ ! -z "$TIMESERVER" ]; then
  echo -n "Setting clock using timeserver ${TIMESERVER}: "
  logger "Setting clock using timeserver ${TIMESERVER}: "
- /usr/sbin/ntpclient -c 1 -g 1 -h ${TIMESERVER} -s 1>/dev/null 2>&1
- if [ $? = 0 ]; then
-	echo -e "Success."
-	logger "Success."
+ if [ `pidof ntpclient` ]; then
+	echo -e "already running."
+	logger "already running."
 	# Set the bios clock using timeserver
-	if [ -x /sbin/hwclock ]; then
-	 echo "Set the bios clock using timeserver"
-	 logger "Set the bios clock using timeserver"
-	 [ -e /var/state/adjtime ] && rm -rf /var/state/adjtime
-	 /sbin/hwclock -w -l >/dev/null
-	fi
+	[ -x /sbin/hwclock ] && set_biosclock
  else
-	echo -e "Failed!"
-	logger "Failed!"
+	start_ntpclient
+	[ $? = 0 ] && set_biosclock
  fi
 fi
-

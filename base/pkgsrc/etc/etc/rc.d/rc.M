@@ -8,8 +8,6 @@
 #export TERMINFO=/etc/terminfo
 #[ "$MEDIA" != "CDROM" ] && [ "$RUN_WIZARD" = "YES" ] && /usr/sbin/wizard --install
 
-echo "Starting network subsystems..."
-
 # Start the inet system
 if [ ! -f /etc/coyote/coyote.conf ]; then
 	echo
@@ -32,7 +30,7 @@ chmod 1777 /tmp
 
 CONFIG_LOADED=YES
 
-# Configure the root password
+echo -n "Configure the root password ..."
 if [ ! -z "$ADMIN_AUTH" ]; then
  [ -r /etc/shadow.tmp ] &&	rm /etc/shadow.tmp
  touch /etc/shadow.tmp
@@ -42,9 +40,12 @@ if [ ! -z "$ADMIN_AUTH" ]; then
  grep -v root: /etc/shadow >> /etc/shadow.tmp
  rm /etc/shadow
  mv /etc/shadow.tmp /etc/shadow
+ echo "DONE"
+else
+ echo "FAULT"
 fi
 
-# Check for the SSH host keys
+echo "Check for the SSH host keys"
 if [ ! -r /etc/dropbear/dropbear_dss_host_key ]; then
  /usr/sbin/ssh-keygen -t dss -f /etc/dropbear/dropbear_dss_host_key
  NEW_KEYS=YES
@@ -57,19 +58,6 @@ if [ ! -r /etc/dropbear/dropbear_rsa_host_key ]; then
 fi
 [ "$NEW_KEYS" = "YES" -a "$READONLY" = "no" ] && /usr/sbin/lrcfg.back ssh_keys
 
-# Set the system clock
-if [ -z "$TZ" ]; then
- TZ="$(cat /etc/timezone)"
- echo "TZ=$TZ" >> /etc/coyote/coyote.conf
-else
- echo "$TZ" > /etc/timezone
-fi
-cp /etc/timezone /etc/TZ
-export TZ
-
-# Set the clock using bios
-[ -x /sbin/hwclock ] && /sbin/hwclock -s -l
-
 # System loggers
 SYSLOG_OPTS="-m 0 -C "
 if [ ! -z "$LOGGING_HOST" ]; then
@@ -80,6 +68,8 @@ fi
 
 #Create the wellcome screen
 . /usr/sbin/mkissue.sh
+
+echo "Starting network subsystems"
 
 # Start the network
 . /etc/rc.d/rc.inet

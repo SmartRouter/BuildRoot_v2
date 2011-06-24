@@ -18,21 +18,35 @@ if [ "$INETTYPE" = "PPP" ] ; then
 		else
 			echo "Calling $PPP_ISP"
 			/usr/sbin/pppd call $PPP_ISP
+			if [ $? = 0 ] ; then
+				INET_UP=YES
+			else
+				INET_UP=NO
+				echo "The dial-up daemon not started properly"
+				logger "The dial-up daemon not started properly"
+			fi
 		fi
 	else
 		if ! [ -f /var/run/ppp0.pid ]; then
 			echo "Calling $PPP_ISP"
 			/usr/sbin/pppd call $PPP_ISP
+			if [ $? = 0 ] ; then
+				INET_UP=READY
+			else
+				INET_UP=NO
+				echo "The dial-up daemon not started properly"
+				logger "The dial-up daemon not started properly"
+			fi
 		fi
 		echo "Using demand dial."
 		ping -c 1 198.41.0.4 </dev/null >/dev/null 2> /dev/null &
 	fi
 else
-#	if [ -f /var/run/ppp0.pid ]; then
-#		echo "PPPoE is running already"
-#		exit 1
-#	else
+	if [ -f /var/run/ppp0.pid ]; then
+		echo "PPPoE is running already"
+		exit 1
+	else
 	 	echo "Starting PPPoE"
 		/usr/sbin/pppd file /etc/ppp/options.pppoe &
-#	fi	
+	fi	
 fi

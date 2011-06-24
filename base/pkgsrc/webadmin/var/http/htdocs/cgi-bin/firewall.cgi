@@ -7,32 +7,14 @@
 SCRIPT="firewall.cgi"
 FILE="/etc/coyote/firewall"
 TMPFILE="/etc/coyote/acctemp"
-RELOAD="/etc/rc.d/rc.firewall"
-COLOR="row6"
-#==================================
-output_line() {
- [ "$DACTIVE" = "Yes" ] && MyC="row4" || MyC="row5"
-cat << CLEOF
-<tr><td class=$MyC>$DACTIVE</td>
-<td class=$COLOR>$DTYPE</td>
-<td class=$COLOR>$DRULE</td>
-<td class=$COLOR>$DPROTO</td>
-<td class=$COLOR>$DSRC</td>
-<td class=$COLOR>$SRPORT</td>
-<td class=$COLOR>$DDEST</td>
-<td class=$COLOR>$DPORT</td>
-<td class=$COLOR nowrap>$DCOMMENT</td>
-<td class=$COLOR nowrap>[<a href=$SCRIPT?ACTION=CALL_EDIT&LINE=$LINECOUNT>Edit</a>] [<a href=$SCRIPT?ACTION=DELETE&LINE=$LINECOUNT>Delete</a>]</td></tr>
-CLEOF
- [ "$COLOR" = "row6" ] && COLOR="row8" || COLOR="row6"
-}
+RELOAD="/etc/rc.d/./rc.firewall"
 #==================================
 set_address() {
  PP="$1"
  NOT=`echo "$PP" | cut -c -3`
  [ "$NOT" = "not" ] && PP=`echo "$PP" | cut -c 5-` || NOT=""
  TAG=`echo "$PP" | cut -c -3`
- if [ "$TAG" = mac ] ; then
+ if [ "$TAG" = mac ]; then
 	PP=`echo "$PP" | cut -c 5-`
 	ADDRESS="$PP"
  else
@@ -110,7 +92,7 @@ treat_line() {
  DRULE=`echo $RULE | tr [p,d] [P,D]`
  PROTO=$4
  DPROTO=`echo $PROTO | tr [a-z] [A-Z]`
- if [ "$PROTO" != "tcp" -a "$PROTO" != "udp" -a "$PROTO" != "all" -a "$PROTO" != "icmp" ] ; then
+ if [ "$PROTO" != "tcp" -a "$PROTO" != "udp" -a "$PROTO" != "all" -a "$PROTO" != "icmp" ]; then
 	PROTON="$PROTO"
 	PROTO=""
  fi
@@ -159,7 +141,7 @@ treat_line() {
 }
 #==================================
 multi_line() {
- while [ -n "$1" ] ; do
+ while [ -n "$1" ]; do
 	[ "$FIRST" != "S" ] && CONFIG_LINE=$CONFIG_LINE"\n"
 	CONFIG_LINE=$CONFIG_LINE"access Y permit $2 $FORM_SRC_IP $FORM_DEST_IP $1 $FORM_COMMENT"
 	FIRST="N"
@@ -177,24 +159,24 @@ mount_configuration() {
 	[ -z "$FORM_PROTOA" ] && [ -z "$FORM_PROTO" ] && FORM_PROTO="all"
 	[ ! -z "$FORM_PROTOA" ] && FORM_PROTO="$FORM_PROTOA"
 	[ "$FORM_PROTO" != "tcp" ] && [ "$FORM_PROTO" != "udp" ] && [ "$FORM_PROTO" != "icmp" ] && FORM_START_PORT="" && FORM_END_PORT="" && FORM_PORT_NOT=""
-	if [ "$FORM_SRC" = "ip" -a "$FORM_SRC" = "mac" -a -z "$FORM_SRC_IP" ] ; then
+	if [ "$FORM_SRC" = "ip" -a "$FORM_SRC" = "mac" -a -z "$FORM_SRC_IP" ]; then
 	 echo "<center><div id=alerta>$Pda</div></center>"
 	 return
 	fi
-	if [ "$FORM_SRC" != "ip" ] ; then
-	 if [ "$FORM_SRC" = "mac" ] ; then
+	if [ "$FORM_SRC" != "ip" ]; then
+	 if [ "$FORM_SRC" = "mac" ]; then
 		FORM_SRC_IP="mac:$FORM_SRC_IP"
 	 else
 		FORM_SRC_IP="$FORM_SRC"
 	 fi
 	fi
 	[ "$FORM_SRC_NOT" = "not" -a "$FORM_SRC_IP" != "any" ] && FORM_SRC_IP="not:$FORM_SRC_IP"
-	if [ "$FORM_DEST" = "ip" -a "$FORM_DEST" = "mac" -a -z "$FORM_DEST_IP" ] ; then
+	if [ "$FORM_DEST" = "ip" -a "$FORM_DEST" = "mac" -a -z "$FORM_DEST_IP" ]; then
 	 echo "<center><div id=alerta>$Pdb</div></center>"
 	 return
 	fi
-	if [ "$FORM_DEST" != "ip" ] ; then
-	 if [ "$FORM_DEST" = "mac" ] ; then
+	if [ "$FORM_DEST" != "ip" ]; then
+	 if [ "$FORM_DEST" = "mac" ]; then
 		FORM_DEST_IP="mac:$FORM_DEST_IP"
 	 else
 		FORM_DEST_IP="$FORM_DEST"
@@ -222,46 +204,66 @@ mount_configuration() {
 }
 #==================================
 show_list() {
-#<td align="center" ><b>Line#</td>
-cat << CLEOF
-<table class=maintable border=0 width=100%>
-<tr><th colspan=10>$Pdd</th></tr>
-<tr>
-<td class=header>$Faj</td>
-<td class=header>$Fak</td>
-<td class=header>$Fal</td>
-<td class=header>$Paj</td>
-<td class=header nowrap>$Fam</td>
-<td class=header nowrap>$Fao</td>
-<td class=header nowrap>$Fan</td>
-<td class=header nowrap>$Fao</td>
-<td class=header>$Fad</td>
-<td class=header>$Fac</td></tr>
-CLEOF
-LINECOUNT=0
-cat $FILE | while read TMPLINE; do
- LINECOUNT=$(($LINECOUNT+1))
- TMPLINE2=`echo "$TMPLINE" | cut -f 1 -d \# | tr [A-Z] [a-z]`
- case "$TMPLINE2" in
-	\#*|"") continue ;;
-	admin*|access*) treat_line $TMPLINE2; output_line; ;;
- esac
-done
-cat << CLEOF
-</table><br>
-<table class=maintable><tr><td>
-<b>$Pde</td><td></b>[ <a href=$SCRIPT?ACTION=CALL_ADD&METHOD=A><u>$Pdf</u></a> &nbsp; | &nbsp;
-<a href=$SCRIPT?ACTION=CALL_ADD&METHOD=F><u>$Pdg</u></a> ]<br></td></tr><tr><td>
-<b>$Egf</td><td></b> [ <a href=$SCRIPT?ACTION=RELOAD> <u>$Pau</u></a> &nbsp; | &nbsp;
-<a href="editconf.cgi?CONFFILE=/etc/coyote/firewall&DESCFILE=Firewall Configuration"><u>$Pav</u></a> &nbsp; | &nbsp;
-<a href="editconf.cgi?CONFFILE=/etc/coyote/firewall.local&DESCFILE=Custom Firewall Rules"><u>$Pdh</u></a> ]
-</td></tr></table>
-<br>
-CLEOF
+ init_table "maintable"
+ init_add_control "$Pde"
+ add_control "$SCRIPT?ACTION=CALL_ADD&METHOD=A" "$Pdf"
+ add_control "$SCRIPT?ACTION=CALL_ADD&METHOD=F" "$Pdg"
+ end_add_control
+ init_add_control "$Egf"
+ add_control "$SCRIPT?ACTION=RELOAD" "$Pau"
+ add_control "editconf.cgi?CONFFILE=/etc/coyote/firewall&DESCFILE=Firewall Configuration" "$Pav"
+ add_control "editconf.cgi?CONFFILE=/etc/coyote/firewall.local&DESCFILE=Custom Firewall Rules" "$Pdh"
+ end_add_control
+ end_table
+ echo "<br>"
+ init_main_table
+ add_title "$Pdd" "9"
+ header_table "$Faj" "$Fak" "$Fal" "$Paj" "$Fam" "$Fao" "$Fan" "$Fao" "$Fad"
+ LINECOUNT=0
+ VAZ="VAZIOVAZIOVAZIO"
+ awk -vFye=$Fye -vFno=$Fno -vVAZ=$VAZ -F"#" '{
+    COMMENT=$2; LINHA=$1; search=" "; n=split(LINHA,array,search);
+	TYPE=array[1];
+	{ if ( array[2] == "Y" ) { DACTIVE=Fye } else { DACTIVE=Fno } }
+    { if ( array[8] == "" ) { array8=VAZ } else { array8=array[8] } }
+    }
+	{print TYPE" "DACTIVE" "array[3]" "array[4]" "array[5]" "array[6]" "array[7]" "array8" "COMMENT}' $FILE | while read TYPE ACTIVE RULE PROTO P5 P6 P7 P8 COMMENT; do
+	LINECOUNT=$(($LINECOUNT+1))
+	case "$TYPE" in
+	 admin*|access*)
+ [ "$P8" = "$VAZ" ] && P8="" || P8=$P8
+
+ set_address "$P5"
+ [ -n "$NOT" ] && DNOT="Not " || DNOT=""
+ desc_tag "$TAG"
+ [ "$TAG" = "IP" ] && DTAG=""
+ DSRC="$DNOT $DTAG $ADDRESS"
+
+ set_address "$P6"
+ [ -n "$NOT" ] && NOT="Not " || NOT=""
+ desc_tag "$TAG"
+ [ "$TAG" = "IP" ] && DTAG=""
+ DDEST="$DNOT $DTAG $ADDRESS"
+
+ PORT_NOT=`echo "$P7" | cut -c -3`
+ [ "$PORT_NOT" = "not" ] && P7=`echo "$P7" | cut -c 5-` || PORT_NOT=""
+ [ -n "$PORT_NOT" ] && DPORT_NOT="Not " || DPORT_NOT=""
+ DPORT=$DPORT_NOT`echo $P7 | tr [a-z] [A-Z]`
+
+ SPORT_NOT=`echo "$P8" | cut -c -3`
+ [ "$SPORT_NOT" = "not" ] && P8=`echo "$P8" | cut -c 5-` || SPORT_NOT=""
+ [ -n "$SPORT_NOT" ] && SRPORT_NOT="Not " || SRPORT_NOT=""
+ SRPORT=$SRPORT_NOT`echo $P8 | tr [a-z] [A-Z]`
+
+		output_line "$ACTIVE" "`echo $TYPE | tr [a] [A]`" "`echo $RULE | tr [p,d] [P,D]`" "`echo $PROTO | tr [a-z] [A-Z]`" "$DSRC" "$SRPORT" "$DDEST" "$DPORT" "$COMMENT"
+        ;;
+	esac
+ done
+ end_table
 }
 #==================================
 print_option () {
- if [ -n "$2" ] ; then
+ if [ -n "$2" ]; then
 	desc_tag "$1"
 	echo -n "<option value=$1"
 	[ "$1" = "$SEL_TAG" ] && echo -n " selected"
@@ -321,90 +323,39 @@ address_options () {
 }
 #==================================
 show_form() {
- [ "$METHOD" = "A" ] && FORMTITLE="$Pdi"|| FORMTITLE="$Pdj"
-cat << CLEOF
-<center>
-<form method="POST" action="$SCRIPT"><input type=hidden value="$METHOD" name=METHOD><input type=hidden value="$LINE" name=LINE><input type=hidden value="$ACTION" name=ACTION>
-<table  class=maintable border=0 width="100%"><tr><th colspan=2>$FORMTITLE</td></tr>
-<tr><td class=row1 align=right><b>$Paz</b><br>$Pba</td>
-  <td class=row2><input type=radio value=n name=ACTIVE `[ "$ACTIVE" = "n" ] && echo checked`>$Fno &nbsp;<input type=radio value=y name=ACTIVE `[ "$ACTIVE" != "n" ] && echo checked`>$Fye</td></tr>
-<tr><td class=row1 align=right><b>$Fal</b><br>$Pdk</td>
-  <td class=row2><input type=radio name=RULE value=permit `[ "$RULE" = "permit" ] && echo checked`>$Fap &nbsp;<input type=radio name=RULE value=deny `[ "$RULE" = "deny" ] && echo checked`>$Faq<br>
-  <input type=text name=RULET value="$RULET" size=17></td></tr>
-<tr><td class=row1 align=right><b>$Paj</b><br>$Pbn</td>
-  <td class=row2><select name=PROTOA><option value></option>
-	<option value=all `[ "$PROTO" = "all" ] && echo selected`>ALL</option>
-	<option value=tcp `[ "$PROTO" = "tcp" ] && echo selected`>TCP</option>
-	<option value=udp `[ "$PROTO" = "udp" ] && echo selected`>UDP</option>
-	<option value=icmp `[ "$PROTO" = "icmp" ] && echo selected`>ICMP</option>
-	</select>&nbsp; $Far &nbsp;<input type=text name=PROTO value="$PROTON" size=5></td></tr>
-<tr><td class=row1 align=right><b>$Pdl</b><br>$Pdm<br>$Pdn</td>
- <td class=row2><input value=not name=SRC_NOT type=checkbox `[ -n "$SRC_NOT" ] && echo " checked"`>Not</input></br>
-        `address_options SRC`
-        <br><input type=text name=SRC_IP value="$SRC_IP" size=22></td></tr>
-
-<tr><td class=row1 align=right><b>$Pbp</b></td>
-  <td class=row2><input value=not name=SPORT_NOT type=checkbox `[ -n "$SPORT_NOT" ] && echo " checked"`>Not</input></br>
-	<input type=text name=SSTART_PORT value="$SSTART_PORT" size=22></td></tr>
-<tr><td align=right class=row1><b>$Pbr ($Fop)</b></td>
- <td class=row2><input type=text name=SEND_PORT value="$SEND_PORT" size=22></td></tr>
-
-<tr><td class=row1 align=right><b>$Pdo</b><br>$Pdp<br>$Pdq</td>
- <td class=row2><input value=not name=DEST_NOT type=checkbox `[ -n "$DEST_NOT" ] && echo " checked"`>Not</input></br>
-        `address_options DEST`
-        <br><input type=text name=DEST_IP value="$DEST_IP" size=22></td></tr>
-
-<tr><td class=row1 align=right><b>$Pbp</b><br>$Pdr</td>
- <td class=row2><input value=not name=PORT_NOT type=checkbox `[ -n "$PORT_NOT" ] && echo " checked"`>Not</input></br>
-        <input type=text name=START_PORT value="$START_PORT" size=22></td></tr>
-<tr><td align=right class=row1><b>$Pbr ($Fop)</b><br>$Pbs</td>
- <td class=row2><input type=text name=END_PORT value="$END_PORT" size=22></td></tr>
-
-<tr><td align=right class=row1><b>$Fad ($Fop)</b><br>$Pbt<br>$Pbu ($Pbw "Web01 HTTP").</td>
- <td class=row2><input type=text name=COMMENT value="$COMMENT" size=30></td></tr>
-</table><p align=center><input type=submit value="$Fsb" name=OKBTN>&nbsp;&nbsp;<input type=reset value="$Fer"></p>
-</form></center>
-CLEOF
+ echo "<center>"
+ init_form
+ input_hidden "METHOD" "$METHOD"
+ init_main_table
+ [ "$METHOD" = "A" ] && add_title "$Pdi" || add_title "$Pdj"
+ form_info_item "$Paz" "$Pba" "$(input_radio "ACTIVE" "n" "$Fno" "`[ "$ACTIVE" = "n" ] && echo checked`") $(input_radio "ACTIVE" "y" "$Fye" "`[ "$ACTIVE" != "n" ] && echo checked`")"
+ form_info_item "$Fal" "$Pdk" "$(input_radio "RULE" "permit" "$Fap" "`[ "$RULE" = "permit" ] && echo checked`") $(input_radio "RULE" "deny" "$Faq" "`[ "$RULE" = "deny" ] && echo checked`")<br>$(input_text "RULET" "$RULET" "17")"
+ form_info_item "$Paj" "$Pbn" "$(init_combobox "PROTOA") $(add_item_combobox "" "" "") $(add_item_combobox "all" "ALL" "`[ "$PROTO" = "all" ] && echo selected`") $(add_item_combobox "tcp" "TCP" "`[ "$PROTO" = "tcp" ] && echo selected`") $(add_item_combobox "udp" "UDP" "`[ "$PROTO" = "udp" ] && echo selected`") $(add_item_combobox "icmp" "ICMP" "`[ "$PROTO" = "icmp" ] && echo selected`") $(end_combobox) $Far $(input_text "PROTO" "$PROTON" "5")"
+ form_info_item "$Pdl" "$Pdm<br>$Pdn" "$(input_checkbox "SRC_NOT" "not" "Not" "`[ -n "$SRC_NOT" ] && echo " checked"`") `address_options SRC`<br> $(input_text "SRC_IP" "$SRC_IP" "22")"
+ form_info_item "$Pbp" " " "$(input_checkbox "SPORT_NOT" "not" "Not" "`[ -n "$SPORT_NOT" ] && echo " checked"`")<br>$(input_text "SSTART_PORT" "$SSTART_PORT" "22")"
+ form_info_item "$Pbr ($Fop)" " " "$(input_text "SEND_PORT" "$SEND_PORT" "22")"
+ form_info_item "$Pdo" "$Pdp<br>$Pdq" "$(input_checkbox "DEST_NOT" "not" "Not" "`[ -n "$DEST_NOT" ] && echo " checked"`") `address_options DEST`<br> $(input_text "DEST_IP" "$DEST_IP" "22")"
+ form_info_item "$Pbp" "$Pdr" "$(input_checkbox "PORT_NOT" "not" "Not" "`[ -n "$PORT_NOT" ] && echo " checked"`")<br>$(input_text "START_PORT" "$START_PORT" "22")"
+ form_info_item "$Pbr ($Fop)" "$Pbs" "$(input_text "END_PORT" "$END_PORT" "22")"
+ form_info_item "$Fad ($Fop)" "$Pbt<br>$Pbu ($Pbw \"Web01 HTTP\")." "$(input_text "COMMENT" "$COMMENT" "30")"
+ end_table
+ end_form
 }
 #==================================
 # MAIN ROUTINE
 cl_header2 "$Pdd - BrazilFW"
 if [ "$FORM_OKBTN" = "$Fsb" ]; then
  mount_configuration
- if [ -n "$CONFIG_LINE" ] ; then
-	if [ "$FORM_ACTION" = "ADD" ]; then
-	 echo -e $CONFIG_LINE >> $FILE
-	else
-	 LINECOUNT=0
-	 echo -n > $TMPFILE
-	 cat $FILE | while read TMPLINE; do
-		LINECOUNT=$(($LINECOUNT+1))
-		if [ "$LINECOUNT" -ne "$FORM_LINE" ] ; then
-		 echo "$TMPLINE" >> $TMPFILE
-		else
-		 echo $CONFIG_LINE >> $TMPFILE
-		fi
-	 done
-	 rm -f $FILE
-	 mv $TMPFILE $FILE
-	 touch /tmp/need.save
-	fi
-	echo "<center><div id=back>$Pcn<br><a href=$SCRIPT?ACTION=RELOAD class=lnk><u>$Pco</u></a><br><a href=backup.cgi class=lnk><u>$Wtl</u></a></div></center><br>"
+ if [ -n "$CONFIG_LINE" ]; then
+	[ "$FORM_ACTION" = "ADD" ] && addline "$CONFIG_LINE" $FILE || changeline $FORM_LINE "$CONFIG_LINE" $FILE
+	alert "$Pcn" "$Pco"
  fi
 fi
 
 case "$FORM_ACTION" in
  "DELETE")
-	LINECOUNT=0
-	echo -n > $TMPFILE
-	cat $FILE | while read TMPLINE; do
-	 LINECOUNT=$(($LINECOUNT+1))
-	 [ "$LINECOUNT" -ne "$FORM_LINE" ] && echo "$TMPLINE" >> $TMPFILE
-	done
-	rm -f $FILE
-	mv $TMPFILE $FILE
-	touch /tmp/need.save
-	echo "<center><div id=back>$Pcp<br><a href=$SCRIPT?ACTION=RELOAD class=lnk><u>$Pco</u></a><br><a href=backup.cgi class=lnk><u>$Wtl</u></a></div></center><br>"
+	deleteline "$FORM_LINE" $FILE
+	alert "$Pcp" "$Pco"
 	show_list
  ;;
  "CALL_EDIT")
@@ -430,12 +381,8 @@ case "$FORM_ACTION" in
 	SEND_PORT=""
 	show_form
  ;;
- "RELOAD")
-	echo "<br><pre>"
-	$RELOAD
-	echo "</pre><center><div id=back><a href=$SCRIPT class=lnk><u>$Fbk</u></a></div></center><br>"
- ;;
- *) show_list ;;
+ "RELOAD") command_reload;;
+ *) show_list;;
 esac
 
 cl_footer2

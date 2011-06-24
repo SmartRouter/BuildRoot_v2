@@ -11,10 +11,10 @@ BACKTITLE="BrazilFW Firewall and Router -- Configuration Menu"
 
 WAIT() {
 if [ -n "$1" ]; then
-   rm -f /tmp/TMP.done 2>/dev/null
-   ( while [ ! -e "/tmp/TMP.done" ]; do sleep 1 ; done | $DIALOG --backtitle "$BACKTITLE" --sleep 1 --infobox "$2" 4 40 ) &
-   else
-   touch "/tmp/TMP.done";wait;rm -f /tmp/TMP.done 2>/dev/null
+ rm -f /tmp/TMP.done 2>/dev/null
+ ( while [ ! -e "/tmp/TMP.done" ]; do sleep 1 ; done | $DIALOG --backtitle "$BACKTITLE" --sleep 1 --infobox "$2" 4 40 ) &
+else
+ touch "/tmp/TMP.done";wait;rm -f /tmp/TMP.done 2>/dev/null
 fi
 }   
 
@@ -122,29 +122,29 @@ $DIALOG --clear \
 subreturn=$?
 exec 3>&-
 case $subreturn in               
-     1) QUIT;;
-     0)
-       case $value in
-            1) edit /etc/coyote/coyote.conf;;
-            2) /usr/sbin/chpasswd;;
-            3) edit /etc/rc.d/rc.local;;
-            4) edit /etc/coyote/firewall.local;;
-            5) edit /etc/coyote/firewall;;
-            6) edit /etc/coyote/portforwards;;
-            C) SHOWCFG;;
-            D) DIALUP;;
-            F) FIREWALL;; 
-            K) SHOWLOG;;
-            G) /usr/sbin/wizard;;
-            H) HANGUP;;
-            I) /usr/sbin/iptraf -l $IF_LOCAL;;
-            R) REBOOT;;
-            S) SHUTDOWN;;
-            W) BACKUP;;
-            Q) QUIT;;
-            L) clear
-               exit 10;               
-               ;;
-        esac;;   
-esac
+ 1) QUIT;;
+ 0)
+	case $value in
+	 1) edit /etc/coyote/coyote.conf;;
+	 2) /usr/sbin/chpasswd;;
+	 3) edit /etc/rc.d/rc.local;;
+	 4) edit /etc/coyote/firewall.local;;
+	 5) edit /etc/coyote/firewall;;
+	 6) edit /etc/coyote/portforwards;;
+	 C) SHOWCFG;;
+	 D) DIALUP;;
+	 F) FIREWALL;; 
+	 K) SHOWLOG;;
+	 G) /usr/sbin/wizard;;
+	 H) HANGUP;;
+	 I) /usr/sbin/iptraf -l $IF_LOCAL;;
+	 R) REBOOT;;
+	 S) SHUTDOWN;;
+	 W) BACKUP;;
+	 Q) QUIT;;
+	 L) clear
+	 exit 10;               
+	 ;;
+	esac;;   
+ esac
 done

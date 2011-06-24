@@ -654,6 +654,7 @@ Baq="Log Outgoing Access"
 Bar="Debug Mode (Log each firewall command)"
 Bas="Max Conntrack Table Size (Not Recommended)"
 Bat="Disable Native Language (Use English)"
+Bau="Set standby (spindown) timeout in minutes (0=disable)"
 # file sfirewall.cgi
 Pns="Level 7 Protocols Filtering"
 Pnt="List the protocols name you want to block."

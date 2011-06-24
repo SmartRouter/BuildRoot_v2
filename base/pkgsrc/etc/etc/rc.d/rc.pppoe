@@ -23,14 +23,15 @@ chmod 600 /etc/ppp/*-secrets
 echo "Starting pppd"
 ifconfig $IF_INET up mtu 1500 
 if [ $? = 0 ] ; then
-	pppd file /etc/ppp/options.pppoe &
-	if [ $? = 0 ] ; then
-		INET_UP=READY
-	else
-		INET_UP=DOWN
-		echo "PPP Daemon not started properly"
-		logger "PPP Daemon not started properly"
-	fi
+	/usr/sbin/ppp.dial
+#	pppd file /etc/ppp/options.pppoe &
+#	if [ $? = 0 ] ; then
+#		INET_UP=READY
+#	else
+#		INET_UP=DOWN
+#		echo "PPP Daemon not started properly"
+#		logger "PPP Daemon not started properly"
+#	fi
 else
 	INET_UP=DOWN
 	echo "The Internet Network Interface Card was not set properly"

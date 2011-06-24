@@ -9,15 +9,4 @@
 # Build the PPP Config files if necessary
 [ "$PPP_CONFIG_OTF" = "YES" ] && . /usr/sbin/mkpppconf.sh
 
-pppd call $PPP_ISP
-if [ $? = 0 ]; then
-	if [ "$PPP_DEMANDDIAL" != "NO" ] ; then
-		INET_UP=READY
-	else
-		INET_UP=YES
-	fi
-else
-	INET_UP=NO
-	echo "The dial-up daemon not started properly"
-	logger "The dial-up daemon not started properly"
-fi
+/usr/sbin/ppp.dial

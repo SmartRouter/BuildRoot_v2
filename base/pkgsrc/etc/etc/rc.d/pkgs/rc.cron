@@ -6,12 +6,12 @@
 
 . /etc/coyote/coyote.conf
 if [ "$ENABLE_CRON" = "YES" ] ; then
-  which crond > /dev/null 2> /dev/null
-  if [ $? = 0 ] ; then
-    echo "Starting cron"
-    logger "Starting cron"
-    crond
-  else
-    ERROR: Cron is not installed and could not be started
-  fi
+ which crond > /dev/null 2> /dev/null
+ if [ $? = 0 ] ; then
+	echo "Starting cron"
+	logger "Starting cron"
+	crond
+ else
+	ERROR: Cron is not installed and could not be started
+ fi
 fi

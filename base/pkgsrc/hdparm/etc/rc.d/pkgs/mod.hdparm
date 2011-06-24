@@ -8,16 +8,16 @@ echo "Setting disk sleeping timeout..."
 /sbin/hdparm -S 12 /dev/boot
 
 if [ -e "/tmp/partition.info" ]; then
-   . /tmp/partition.info
-   HD=`echo $DEVICE | sed s\~/dev/~~g | sed s/[0-9]//g`
-   if [ -e "/proc/ide/$HD/driver" ]; then
-      VERIFY=`cat /proc/ide/$HD/driver | grep -c -i "ide-disk"`
-      else
-      VERIFY=0
-   fi
-   if [ "$VERIFY" = 1 ]; then
-      HD=`echo $DEVICE | sed s/[0-9]//g`
-      echo "Set HDPARM Settings..."
-      /sbin/hdparm -a255 -c1 -d1 -u1 -k1 -m16 -X68 $HD
-   fi
+ . /tmp/partition.info
+ HD=`echo $DEVICE | sed s\~/dev/~~g | sed s/[0-9]//g`
+ if [ -e "/proc/ide/$HD/driver" ]; then
+	VERIFY=`cat /proc/ide/$HD/driver | grep -c -i "ide-disk"`
+ else
+	VERIFY=0
+ fi
+ if [ "$VERIFY" = 1 ]; then
+	HD=`echo $DEVICE | sed s/[0-9]//g`
+	echo "Set HDPARM Settings..."
+	/sbin/hdparm -a255 -c1 -d1 -u1 -k1 -m16 $HD
+ fi
 fi

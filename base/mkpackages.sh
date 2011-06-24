@@ -98,12 +98,12 @@ buildpkg (){
 buildall() {
   ln -s ../cd packages
 
-  create_modules
-  create_drivers
-  create_advroute
-  create_bridge
-  create_l7filter
-  create_root
+#  create_modules
+#  create_drivers
+#  create_advroute
+#  create_bridge
+#  create_l7filter
+#  create_root
 
   cd pkgsrc
   buildpkg advroute

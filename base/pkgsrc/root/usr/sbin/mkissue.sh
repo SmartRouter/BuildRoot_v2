@@ -7,7 +7,8 @@
 [ -z "$SSH_PORT" ] && SSH_PORT=22
 [ -z "$WEBADMIN_PORT" ] && WEBADMIN_PORT=8180
 [ -z "$ADMIN_AUTH" ] && MESSAGE="password not set yet, press [ENTER]"
-BFW_INFO=`echo CPU:[1m\`grep "model name" /proc/cpuinfo | cut -d: -f2\` \`grep "MHz" /proc/cpuinfo |cut -d: -f2 |cut -d. -f1\`MHz [0m/ Memory:[1m\`grep "MemTotal" /proc/meminfo |cut -d: -f2\`[1m'`
+CPUINFO1=$(grep "model name" /proc/cpuinfo | cut -f 2 -d ':' | uniq ; grep MHz /proc/cpuinfo | cut -f 2 -d ':' | uniq ; echo "MHz" ; echo "(`grep -ci "model name" /proc/cpuinfo` x)")
+BFW_INFO=`echo CPU:[1m$CPUINFO1 [0m/ Memory:[1m\`grep "MemTotal" /proc/meminfo |cut -d: -f2\`[1m'`
 echo -ne "
 
            [0;34m,-----. [1;36m                      [1;37m ,--.,-[0;37m-.,----[0;36m--.,--. [1;36m  ,--. 
