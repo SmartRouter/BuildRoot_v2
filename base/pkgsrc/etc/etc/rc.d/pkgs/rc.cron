@@ -12,6 +12,6 @@ if [ "$ENABLE_CRON" = "YES" ] ; then
 	logger "Starting cron"
 	crond
  else
-	ERROR: Cron is not installed and could not be started
+	echo "ERROR: Cron is not installed and could not be started"
  fi
 fi

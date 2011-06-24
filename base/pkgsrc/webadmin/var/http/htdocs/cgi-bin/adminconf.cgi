@@ -2,7 +2,7 @@
 . /var/http/web-functions
 . /etc/coyote/coyote.conf
 SCRIPT="/cgi-bin/adminconf.cgi"
-cl_header2 "$Baa - BrazilFW"
+cl_header2 "$Baa - SmartRouter"
 if [ "$FORM_OKBTN" = "$Fsb" ]; then
  HOSTNAME=$FORM_HOSTNAME
  DOMAINNAME=$FORM_DOMAINNAME
@@ -23,7 +23,7 @@ if [ "$FORM_OKBTN" = "$Fsb" ]; then
  MAX_CONNTRACK=$FORM_MAX_CONNTRACK
  HD_SLEEP_TIME=$FORM_HD_SLEEP_TIME
  cl_rebuildconf
- echo "<center><div id=alerta>$Wba $Wtc</div></center>"
+ alert "$Wba" "$Wtc"
 else
  [ "$HD_SLEEP_TIME" = "" ] && HD_SLEEP_TIME=0
  [ "$ENABLE_EXTERNAL_PING" = "YES" ] && PING_YES='checked' || PING_NO='checked'

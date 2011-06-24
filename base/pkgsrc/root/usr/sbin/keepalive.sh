@@ -40,7 +40,7 @@ net_check() {
 #==========
 arp_check() {
  # if Link Status is FAIL then use arping to discovery new MAC
- loss=`$ARPING ${1} ${2} | grep "Received" | cut -d" " -f2"`
+ loss=`$ARPING ${1} ${2} | grep "Received" | cut -d" " -f2`
  [ "$loss" = "0" ] && LS="3" || LS="2"
  return $LS
 }

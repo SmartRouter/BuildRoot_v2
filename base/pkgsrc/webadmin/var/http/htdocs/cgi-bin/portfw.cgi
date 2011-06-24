@@ -244,7 +244,7 @@ show_wizard() {
 }
 #==================================
 # MAIN ROUTINE
-cl_header2 "$Pah - BrazilFW"
+cl_header2 "$Pah - SmartRouter"
 if [ "$FORM_OKBTN" = "$Fsb" ]; then
  mount_configuration
  if [ -n "$CONFIG_LINE" ] ; then

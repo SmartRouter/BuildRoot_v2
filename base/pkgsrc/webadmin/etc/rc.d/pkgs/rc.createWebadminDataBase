@@ -1,0 +1,44 @@
+#!/bin/sh
+
+create_cpu(){
+ /bin/rrdtool create /tmp/cpu.rrd --step 60 \
+ DS:memory:GAUGE:200:0:U \
+ $(for x in $(seq 1 $(cat /proc/stat | grep "cpu[0-9]" | wc -l));do echo "DS:cpu$x:GAUGE:61:0:U "; done) \
+ DS:use:GAUGE:200:0:U \
+ RRA:AVERAGE:0.5:1:1440
+}
+
+
+
+stop(){
+ ls /tmp/pidrrd/*.rrd > /tmp/RRD && echo "Some data mining threads already running, stoping ..." \
+ || echo "No data mining threads already running"
+ while read TMPFILE; do
+	RRDPID=`cat "$TMPFILE" 2>/dev/null` && { rm -f /tmp/pidrrd/"$TMPFILE"; kill -9 $RRDPID 2>/dev/null; }
+ done
+# < /tmp/RRD
+# rm -f /tmp/RRD
+# rm -f $WWW/img/*
+ sleep 5
+}
+
+case $1 in
+ CREATE)
+	create_cpu
+ ;;
+ STOP)
+	stop
+ ;;
+ *)
+	echo "Create data base colector"
+	create_cpu
+	echo "Initializing the data collection."
+	mkdir /tmp/pidrrd/
+	sleep 3
+	/var/http/htdocs/cgi-bin/graph/cpu/rrd/updateDataBase 0<&- 1>/dev/null 2>&1 &
+	echo $! > /tmp/pidrrd/cpu.rrd
+ ;;
+esac
+
+
+

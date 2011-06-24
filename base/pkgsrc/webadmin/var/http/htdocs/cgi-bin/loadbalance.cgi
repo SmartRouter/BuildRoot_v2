@@ -235,7 +235,7 @@ echo "<tr><td class=row1 align=right><b>$Fad ($Fop)</b><br>$Egr</td><td class=ro
 }
 #==================================
 # MAIN ROUTINE
-cl_header2 "$Pti - BrazilFW"
+cl_header2 "$Pti - SmartRouter"
 if [ "$FORM_OKBTN" = "$Fsb" ]; then
  [ "$FORM_METHOD" = "P" ] && CONFIG_LINE="port $FORM_ACTIVE $FORM_LB $FORM_LAN $FORM_NET $FORM_MASK #$FORM_COMMENT"
  [ "$FORM_METHOD" = "N" ] && CONFIG_LINE="net $FORM_ACTIVE $FORM_LB $FORM_LAN $FORM_NET $FORM_MASK #$FORM_COMMENT"

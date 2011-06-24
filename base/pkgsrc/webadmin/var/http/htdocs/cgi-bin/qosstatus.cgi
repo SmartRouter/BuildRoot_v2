@@ -9,7 +9,7 @@ INETIF=$IF_INET
 if [ "$INETTYPE" = "PPP" -o "$INETTYPE" = "PPPOE" ]; then
    INETIF=ppp0
 fi
-cl_header2 "$Pik - BrazilFW"
+cl_header2 "$Pik - SmartRouter"
 echo "<table class=maintable width=100%><tr><th><b>$Pff</b></th></tr><tr><td class=row1><pre>"
 echo "$Pil $QOS_TYPE"
 if [ "$QOS_TYPE" != "DISABLED" -a "$QOS_TYPE" != "" ]; then

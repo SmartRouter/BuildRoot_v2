@@ -3,7 +3,7 @@
 # Changed to support subnet QOS in others LAN interfaces
 # by BFW user "agsoliveira" - Revision by BFW user "marcos do vale" - 10/09/2007
 
-echo "IF_LOCAL=${IF_LOCAL}" > /tmp/netsubsys.state
+echo "IF_LOCAL=${IF_LOCAL}" >> /tmp/netsubsys.state
 echo "LOCAL_UP=${LOCAL_UP}" >> /tmp/netsubsys.state
 echo "IF_INET=${IF_INET}" >> /tmp/netsubsys.state
 echo "INET_UP=${INET_UP}" >> /tmp/netsubsys.state

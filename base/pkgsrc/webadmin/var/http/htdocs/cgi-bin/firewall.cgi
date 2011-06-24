@@ -343,7 +343,7 @@ show_form() {
 }
 #==================================
 # MAIN ROUTINE
-cl_header2 "$Pdd - BrazilFW"
+cl_header2 "$Pdd - SmartRouter"
 if [ "$FORM_OKBTN" = "$Fsb" ]; then
  mount_configuration
  if [ -n "$CONFIG_LINE" ]; then

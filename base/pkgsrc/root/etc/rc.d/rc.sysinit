@@ -66,7 +66,7 @@ if [ -n "$BOOT" ]; then
                   TYPE="PATA"
                   mount -o ro /dev/$DEVICE $MNT 2>/dev/null
                   if [ "$?" = 0 ]; then
-                     if [ -e "$MNT/brazilfw.dpy" ]; then
+                     if [ -e "$MNT/SRP.dpy" ]; then
                         FSTYPE=vfat
                         MANUAL_BOOT=1
                         echo "5#$TYPE#/dev/$DEVICE#$FSTYPE#no#no"
@@ -93,7 +93,7 @@ if [ -n "$BOOT" ]; then
             if [ "$(echo $DEVICE | sed s/[^0123456789]//g)" = 1 ]; then
                mount -o ro /dev/$DEVICE $MNT 2>/dev/null
                if [ "$?" = 0 ]; then
-                  if [ -e "$MNT/brazilfw.dpy" ]; then
+                  if [ -e "$MNT/SRP.dpy" ]; then
                      FSTYPE=vfat
                      case $TYPE in
                           PENDRIVE) POSITION=1;BCKDELAY="yes";;
@@ -115,7 +115,7 @@ if [ "$MANUAL_BOOT" = 0 ]; then
           DEVICE=`basename $CDROM`
           mount -o ro /dev/$DEVICE $MNT -t iso9660 2>/dev/null
           if [ "$?" = 0 ]; then
-             if [ -e "$MNT/brazilfw.dpy" ]; then
+             if [ -e "$MNT/SRP.dpy" ]; then
                 echo "0#CDROM#/dev/$DEVICE#iso9660#yes#no"
              fi
              umount $MNT 2>/dev/null
@@ -131,7 +131,7 @@ if [ "$MANUAL_BOOT" = 0 ]; then
                      TYPE="PATA"
                      mount -o ro /dev/$DEVICE $MNT 2>/dev/null
                      if [ "$?" = 0 ]; then
-                        if [ -e "$MNT/brazilfw.dpy" ]; then
+                        if [ -e "$MNT/SRP.dpy" ]; then
                            FSTYPE=vfat
                            echo "5#$TYPE#/dev/$DEVICE#$FSTYPE#no#no"
                         fi
@@ -158,7 +158,7 @@ if [ "$MANUAL_BOOT" = 0 ]; then
                if [ "$(echo $DEVICE | sed s/[^0123456789]//g)" = 1 ]; then
                   mount -o ro /dev/$DEVICE $MNT 2>/dev/null
                   if [ "$?" = 0 ]; then
-                     if [ -e "$MNT/brazilfw.dpy" ]; then
+                     if [ -e "$MNT/SRP.dpy" ]; then
                         FSTYPE=vfat
                         case $TYPE in
                              PENDRIVE) POSITION=1;BCKDELAY="yes";;
@@ -289,23 +289,9 @@ fi
 
 umount $MNT
 
-. /etc/coyote/coyote.conf
-
-echo "Set the system clock"
-if [ -z "$TZ" ]; then
- TZ="$(cat /etc/timezone)"
- echo "TZ=$TZ" >> /etc/coyote/coyote.conf
-else
- echo "$TZ" > /etc/timezone
-fi
-cp /etc/timezone /etc/TZ
-export TZ
-
-# Set the clock using bios
-[ -x /sbin/hwclock ] && /sbin/hwclock -s -l
-
 # New Mount Partition by Washington Rodrigues 2008 #
 
+. /etc/coyote/coyote.conf
 if [ "$MEDIA" != "CDROM" ]; then
 
    if [ -z "$PARTITION" ]; then
@@ -328,4 +314,4 @@ if [ "$MEDIA" != "CDROM" ]; then
    fi
 fi
 
-/etc/rc.d/rc.S
+. /etc/rc.d/rc.S

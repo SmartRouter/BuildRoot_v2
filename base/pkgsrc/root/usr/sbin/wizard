@@ -1,5 +1,5 @@
 #!/bin/sh
-# BrazilFW -- Wizard Guide v.0.9 by Washington Rodrigues #
+# SmartRouter -- Wizard Guide v.0.9 by Washington Rodrigues #
 DIALOG=${DIALOG=dialog}
 NETWORKDEVICE=`lshw -disable dmi -disable device-tree -disable spd -disable memory -disable cpuinfo -disable cpuid -disable isapnp -disable pcmcia -disable ide -class network -short 2>/dev/null`
 OIFS="$IFS"
@@ -26,7 +26,7 @@ WIZARD_TYPE=`echo $1 | grep -i -c "\-\-INSTALL\>"`
 [ "$WIZARD_TYPE" = 1 ] && TITLETYPE="Installation" || TITLETYPE="Configuration"
 WIZARDTMP="/tmp/wizard.tmp"
 WIZARDVAR="/tmp/wizardvar.tmp"
-WIZARDTITLE="BrazilFW ($TITLETYPE) -- Wizard Guide v.0.9"
+WIZARDTITLE="SmartRouter ($TITLETYPE) -- Wizard Guide"
 . $COYOTE
 
 SETVAR() {
@@ -416,7 +416,7 @@ welcome() {
 $DIALOG --clear \
         --backtitle "$WIZARDTITLE" \
         --title "Wizard guide" \
-        --msgbox "This Wizard will guide you to configure your BrazilFW.\nFor more information visit the project page at\nhttp://www.brazilfw.com.br" 15 60
+        --msgbox "This Wizard will guide you to configure your SmartRouter.\nFor more information visit the project page at\nhttp://www.smartrouter.com.br/" 15 60
         local_main
 }
 
@@ -509,7 +509,7 @@ value=`$DIALOG --clear \
         --ok-label "Next" \
         --extra-button --extra-label "Back" \
         --checklist "Services" 7 58 0\
-        "DHCP" "Enable BrazilFW Internal DHCP Server " $SERVDHCP \
+        "DHCP" "Enable SmartRouter Internal DHCP Server " $SERVDHCP \
         "SSH" "Enable external access to SSH Service" $SERVSSH 2>&1 1>&3`
 subresult=$?
 exec 3>&-
@@ -706,7 +706,7 @@ if [ "$WIZARD_TYPE" != 1 ]; then
                   --backtitle "$WIZARDTITLE" \
                   --title "Wizard Options" \
                   --no-cancel \
-                  --menu "Congratulation. You have completed\nthe BrazilFW Wizard!\nChoose one option:" 9 40 0 \
+                  --menu "Congratulation. You have completed\nthe SmartRouter Wizard!\nChoose one option:" 9 40 0 \
                  "1" "Save and Exit       " \
                  "2" "Exit without Saving " \
                  "3" "Back to last window " \

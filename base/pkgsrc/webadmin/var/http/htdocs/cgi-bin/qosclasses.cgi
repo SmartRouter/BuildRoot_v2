@@ -159,7 +159,7 @@ CLEOF
 }
 #==================================
 # MAIN ROUTINE
-cl_header2 "$Phe - BrazilFW"
+cl_header2 "$Phe - SmartRouter"
 if [ "$FORM_OKBTN" = "$Fsb" ]; then
    mount_configuration
    if [ -n "$CONFIG_LINE" ] ; then

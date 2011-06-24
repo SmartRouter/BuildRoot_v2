@@ -1,7 +1,12 @@
 #!/bin/sh
 # Source the Web Functions
 . /var/http/web-functions
-cl_header2 "$Mdt - BrazilFW"
+
+add_link(){
+echo "<li><a href=\"/cgi-bin/diags.cgi?COMMAND=$2\">$1</a></li>"
+}
+
+cl_header2 "$Mdt - SmartRouter"
 if [ -n "$FORM_COMMAND" ] ; then
  COMMAND=$FORM_COMMAND
  echo "<table class=maintable><tr><td nowrap>"
@@ -20,33 +25,34 @@ if [ -n "$FORM_COMMAND" ] ; then
  [ -n "$FORM_PARAM" -o -z "$FORM_PARAMNAME" ] && $COMMAND
  echo "</pre></td></tr></table>"
 else 
-cat << CLEOF  
-<table class=maintable border=0><tr><th>$Mdt</th></tr><tr><td><br><ol>
-<li><a href="/cgi-bin/diags.cgi?COMMAND=logread">$Pka</a></li>
-<li><a href="/cgi-bin/diags.cgi?COMMAND=/usr/sbin/showcfg -w">$Pkb</a></li>
-<li><a href="/cgi-bin/diags.cgi?COMMAND=ps">$Pkc</a></li>
-<li><a href="/cgi-bin/diags.cgi?COMMAND=ping -c 4 MARK_param_MARK&PARAMNAME=IP Number or Host Name">Ping</a></li>
-<li><a href="/cgi-bin/diags.cgi?COMMAND=nslookup MARK_param_MARK&PARAMNAME=Host Name">$Pkd</a></li>
-<li><a href="/cgi-bin/diags.cgi?COMMAND=/sbin/ifconfig -a">$Pke</a></li>
-<li><a href="/cgi-bin/diags.cgi?COMMAND=/usr/sbin/dns.test">$Pkf</a></li>
-<li><a href="/cgi-bin/diags.cgi?COMMAND=/usr/sbin/gateway.test">$Pkg</a></li>
-<li><a href="/cgi-bin/diags.cgi?COMMAND=/usr/sbin/iptables -L -n -v">$Pkh</a></li>
-<li><a href="/cgi-bin/diags.cgi?COMMAND=/usr/sbin/iptables -L -t nat -n -v">$Pkh - nat</a></li>
-<li><a href="/cgi-bin/diags.cgi?COMMAND=/usr/sbin/iptables -L -t mangle -n -v">$Pkh - mangle</a></li>
-<li><a href="/cgi-bin/diags.cgi?COMMAND=dmesg">$Pki</a></li>
-<li><a href="/cgi-bin/diags.cgi?COMMAND=lsmod">$Pkj</a></li>
-<li><a href="/cgi-bin/diags.cgi?COMMAND=route">$Pkk</a></li>
-<li><a href="/cgi-bin/diags.cgi?COMMAND=cat /proc/meminfo">$Pkl</a></li>
-<li><a href="/cgi-bin/diags.cgi?COMMAND=df -h">$Pkm</a></li>
-<li><a href="/cgi-bin/diags.cgi?COMMAND=cat /proc/net/arp">$Pkn</a></li>
-<li><a href="/cgi-bin/diags.cgi?COMMAND=cat /proc/net/ip_conntrack">$Pko</a></li>
-<li><a href="/cgi-bin/diags.cgi?COMMAND=cat /proc/pci">$Psb</a></li>
-<li><a href="/cgi-bin/diags.cgi?COMMAND=/usr/sbin/lsnet">$Pue</a></li>
-<li><a href="/cgi-bin/diags.cgi?COMMAND=/sbin/lshw -disable ide -html">$Puf</a></li>
-<li><a href="/cgi-bin/diags.cgi?COMMAND=/usr/sbin/changeboot -info">$Pug</a></li>
-<li><a href="/cgi-bin/diags.cgi?COMMAND=/usr/sbin/changeboot -showdevice">$Puh</a></li>
-<li><a href="/cgi-bin/diags.cgi?COMMAND=/usr/sbin/detecthds">$Pui</a></li>
-</ol></td></tr></table>
-CLEOF
+init_table "maintable"
+add_title "$Mdt"
+echo "<tr><td><br><ol>"
+ add_link "$Pka" "logread"
+ add_link "$Pkb" "/usr/sbin/showcfg -w"
+ add_link "$Pkc" "ps"
+ add_link "PING" "ping -c 4 MARK_param_MARK&PARAMNAME=IP Number or Host Name"
+ add_link "$Pkd" "nslookup MARK_param_MARK&PARAMNAME=Host Name"
+ add_link "$Pke" "/sbin/ifconfig -a"
+ add_link "$Pkf" "/usr/sbin/dns.test"
+ add_link "$Pkg" "/usr/sbin/gateway.test"
+ add_link "$Pkh" "/usr/sbin/iptables -L -n -v"
+ add_link "$Pkh - NAT" "/usr/sbin/iptables -L -t nat -n -v"
+ add_link "$Pkh - MANGLE" "/usr/sbin/iptables -L -t mangle -n -v"
+ add_link "$Pki" "dmesg"
+ add_link "$Pkj" "lsmod"
+ add_link "$Pkk" "route"
+ add_link "$Pkl" "cat /proc/meminfo"
+ add_link "$Pkm" "df -h"
+ add_link "$Pkn" "cat /proc/net/arp"
+ add_link "$Pko" "cat /proc/net/ip_conntrack"
+ add_link "$Psb" "cat /proc/pci"
+ add_link "$Pue" "/usr/sbin/lsnet"
+ add_link "$Puf" "/sbin/lshw -disable ide -html"
+ add_link "$Pug" "/usr/sbin/changeboot -info"
+ add_link "$Puh" "/usr/sbin/changeboot -showdevice"
+ add_link "$Pui" "/usr/sbin/detecthds"
+echo "</ol></td></tr>"
+end_table
 fi
 cl_footer2

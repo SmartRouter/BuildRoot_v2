@@ -1,0 +1,27 @@
+#!/bin/sh
+
+updateDataBase(){
+ MEM=$(free | awk '{ if ($1=="Total:") print int(($3/$2)*100) }')
+ NUMCPU=$(cat /proc/stat | grep "cpu[0-9]" | wc -l)
+
+ NUMERO="";
+ for x in $(seq 1 $NUMCPU);do 
+ 	NUMERO=$NUMERO$(awk ' /^cpu[$(echo "$x")] / {print ":"int(($2+$3+$4+$5+$6)/$5)} ' /proc/stat)
+ done
+
+ RRD_MEM_INFO=`awk '
+	/^MemTotal:/    {RRD_MAX_MEM=$2/1024}
+	/^MemFree:/     {RRD_FRE_MEM=$2/1024}
+	END {
+	 RRD_USE_MEM=RRD_MAX_MEM-RRD_FRE_MEM
+	 print RRD_USE_MEM
+	}' /proc/meminfo`
+
+ /bin/rrdtool update /tmp/cpu.rrd "N:${MEM}${NUMERO}:${RRD_MEM_INFO}"
+
+}
+
+while [ /bin/true ]; do
+updateDataBase
+sleep 60
+done

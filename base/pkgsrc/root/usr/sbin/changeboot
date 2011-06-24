@@ -9,8 +9,8 @@ MNT="/var/lib/lrpkg/mnt"
 
 title() {
   echo
-  echo "Change boot 1.2 by Washington Rodrigues 2008"
-  echo "--------------------------------------------"
+  echo "Change boot 1.2 "
+  echo "----------------"
   echo
 }
 
@@ -236,7 +236,7 @@ case $1 in
                    exit
                    ;;
           "-repair")
-                   SYSLINUX=`echo -en "display brazilfw.dpy\012timeout 0\012default linux\012append  load_ramdisk=1 initrd=root.tgz initrd_dyn=minix ramdisk_size=4096 root=/dev/ram0"`
+                   SYSLINUX=`echo -en "display SRP.dpy\012timeout 0\012default linux\012append  load_ramdisk=1 initrd=root.tgz initrd_dyn=minix ramdisk_size=4096 root=/dev/ram0"`
                    donesystem
                    ;;
       "-showdevice")  

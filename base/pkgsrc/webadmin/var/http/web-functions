@@ -39,7 +39,7 @@ cl_header2 () {
 	cl_menuitem "$Mln" "/cgi-bin/lanconf.cgi"
 	cl_menuitem "$Mic" "/cgi-bin/inetconf.cgi"
 	cl_menuitem "$Pti" "/cgi-bin/loadbalance.cgi"
-	[ ! -z $DMZ_IPADDR ] && cl_menuitem "$Mdz" "/cgi-bin/dmzconf.cgi"
+	cl_menuitem "$Mdz" "/cgi-bin/dmzconf.cgi"
 	cl_menuitem "$Mdh" "/cgi-bin/dhcpconf.cgi"
 	cl_menuitem "$Mac" "/cgi-bin/adminconf.cgi"
 	cl_menuitem "$Mpf" "/cgi-bin/portfw.cgi"

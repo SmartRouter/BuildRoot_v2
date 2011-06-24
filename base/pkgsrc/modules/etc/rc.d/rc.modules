@@ -1,9 +1,6 @@
 #!/bin/sh
 #
-# Coyote module loader init script
-
-# Loop over every line in /etc/modules.
-echo 'Loading modules: '
+echo Loading modules...
 while read module args
 do
  case "$module" in
@@ -11,11 +8,3 @@ do
  esac
  insmod /lib/modules/"$module".o $args > /dev/null
 done < /etc/modules
-
-FILES=`ls /etc/rc.d/pkgs/mod.* 2>/dev/null`
-if [ ! -z "$FILES" ]; then
- for RCS in $FILES
- do
-   	[ -x $RCS ] && $RCS
- done
-fi

@@ -12,7 +12,7 @@
 GW="0.0.0.0"
 
 if [ "$INET_UP" != "UP" ] ; then
- echo Your internet link is not connected
+ echo "Your internet link is not connected"
  exit 1
 else
  if [ "$INETTYPE" = "PPP" -o "$INETTYPE" = "PPPOE" ] ; then
@@ -43,7 +43,7 @@ else
 	 exit 1
 	fi
  else
-	echo Unable to get your gateway address
+	echo "Unable to get your gateway address"
 	exit 1
  fi
 fi

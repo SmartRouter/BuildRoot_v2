@@ -83,7 +83,7 @@ show_form() {
 }
 #==================================
 # MAIN ROUTINE
-cl_header2 "$Mdh - BrazilFW"
+cl_header2 "$Mdh - SmartRouter"
 [ "$FORM_OKBTN" = "$Fsb" ] && mount_configuration
 [ "$FORM_ACTION" = "RELOAD" ] && command_reload || show_form
 cl_footer2

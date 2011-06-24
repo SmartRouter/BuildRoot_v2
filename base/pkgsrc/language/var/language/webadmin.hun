@@ -1,24 +1,11 @@
-# Language File for BrazilFW Linux Web Administrator
+# Language File for Smart Router Linux Web Administrator
 # Hungarian - Hungary
-# MPG - www.mpg.com.br/BrazilFW/ - mpg@mpg.com.br
-# Claudio Roberto Cussuol - claudio_cl@rictec.com.br
+
 # Hungarian translation by Peter Wlaszlovits - wlaszi2@freestart.hu 
-# 
-# Last Changes: 
-# 09/12/2004 - Coyote Version 2.13
-# 12/02/2004 - Coyote Hungarian Language File 1.1
-# 11/18/2004 - Coyote Version 2.16 - Added Simplified Firewall and others
-# 03/27/2005 - Coyote Version 2.22
-#	       Coyote Hungarian Language File 1.2 (some revision)
-# 06/09/2005 - Coyote Hungarian Language File 1.21 (some revision)
+# Hungarian translation Update by NTK - nagytk@hotmail.com
 # 05/15/2005 - Coyote Version 2.24 - Added Cron, Profiles and Others
 # 10/08/2005 - Coyote Hungarian Language File 1.3	
-#
-# Hungarian translation Update by NTK - nagytk@hotmail.com
-# BrazilFW Changes:
-# 11/16/2006 - BraziFW 2.29.4
-# 01/28/2007 - BraziFW 2.30
-#
+
 # Aways use 3 characters to the LANGUAGE_CODE
 # Do not use accented characters on the LANGUAGE_NAME
 LANGUAGE_CODE="HUN"
@@ -27,7 +14,7 @@ ENGLISH_LANGUAGE_NAME="Hungarian - Hungary"
 # Header
 MWE="Webes Adminisztráció"
 VRS="Verzió"
-WEL="Üdvözöljük a BrazilFW Webes Adminisztrációs felületén"
+WEL="Üdvözöljük a Smart Router Webes Adminisztrációs felületén"
 # Menu - Left
 MM="Fõmenü"
 Mh="Információ"
@@ -64,7 +51,7 @@ Wop="Opcionális"
 Wed="és"
 Wnt="Hálózat"
 Wsc="másodperc"
-Wsv="A változtatások megtörténtek BrazilFW Linux konfigurációs file-jában."
+Wsv="A változtatások megtörténtek Smart Router Linux konfigurációs file-jában."
 Wsp="Jelszó beállítása"
 Wcp="Jelszó megváltoztatása"
 Wnp="Új jelszó"
@@ -76,16 +63,16 @@ Wro="Újraindítás"
 Wpo="Lekapcsol"
 Wqo="Újraindít"
 Wso="Kikapcsol"
-Wba="A BrazilFw opcionális beállításai frissültek."
+Wba="A Smart Router opcionális beállításai frissültek."
 Wqa="Ne felejtse elmenteni a beállításait mielõtt újrandítana!"
 # this command is for reset system, not for erase
 Wto="Újraindít"
 # forms
 Fbk="Vissza a listához"
-Fce="BrazilFW szerkesztés"
+Fce="Smart Router szerkesztés"
 Fcf="Megerõsítés,"
 Fcg="Beállítások"
-Fcw="A következõ beállítás be lett írva a BrazilFW-be"
+Fcw="A következõ beállítás be lett írva a Smart Router-be"
 Fdf="<b>Ne felejtsen <i>Backup-ot készíteni</i> mielõtt<i>Újraindítana</i>!</b>"
 Fee="Szerkeszt"
 Feo="Ok"
@@ -215,10 +202,10 @@ Enc="Hálózati kártya MAC hamisítás"
 Efn="Hamis MAC cím használata"
 Euo="Ezt a beállítást csak akkor használja, ha az ISP-d speciális MAC cím használatot kér."
 # file dhcpconf.cgi
-Eed="Bekapcsolja a BrazilFW DNS Cache-t?"
+Eed="Bekapcsolja a Smart Router DNS Cache-t?"
 Ecd="A DNS Cache a gyorsabb névfeloldáshoz szükséges."
-Eds="Bekapcsolja a BrazilFW DHCP szervert?"
-Eha="A LAN-on lévõ számítógépeknek a BrazilFW osztja ki az IP címeket és adja meg a hálózati beállításokat."
+Eds="Bekapcsolja a Smart Router DHCP szervert?"
+Eha="A LAN-on lévõ számítógépeknek a Smart Router osztja ki az IP címeket és adja meg a hálózati beállításokat."
 Esa="Kezdõ IP cím"
 Efs="A DHCP tartomány kezdõ IP címe"
 Eei="Befejezõ IP cím"
@@ -227,13 +214,13 @@ Elt="Bérleti idõ másodpercben"
 Ebl="Ha üresen hagyja, 7200-at állít be (2 órát)."
 Ecz="A beállítások átadásra kerültek a LAN-on lévõ számítógépeknek"
 Ert="Router"
-Ebk="Ha üresen hagyja, a BrazilFW lesz az alapértelmezett router."
+Ebk="Ha üresen hagyja, a Smart Router lesz az alapértelmezett router."
 Esn="Subnet"
-Esm="Ha üresen hagyja, a BrazilFW Local Subnet lesz használva."
+Esm="Ha üresen hagyja, a Smart Router Local Subnet lesz használva."
 Edm="Helyi domain név"
-Eso="Ha üresen hagyja, a BrazilFW Local Domain név lesz használva."
+Eso="Ha üresen hagyja, a Smart Router Local Domain név lesz használva."
 Esp="DNS Szerverek"
-Esr="Ha üresen hagyja, a BrazilFW ugyanazt a DNS szervert használja"
+Esr="Ha üresen hagyja, a Smart Router ugyanazt a DNS szervert használja"
 Ess="vagy a saját címét, ha engedélyezve van a DNS gyorsítótára."
 Est="WINS szerverek"
 Eba="A hálozatán lévõ WINS szerverek"
@@ -394,12 +381,12 @@ Pdz="A szolgáltatást futtató számítógép IP címe."
 Pea="QOS init beállítások"
 Peb="QOS init típus"
 Pec="QOS kikapcsolása"
-Ped="BrazilFW init scriptek (alapbeállítás)"
-Pee="BrazilFW init scriptek (kézi class beállítások)"
+Ped="Smart Router init scriptek (alapbeállítás)"
+Pee="Smart Router init scriptek (kézi class beállítások)"
 Pef="Wonder-shaper init scriptek"
 Peg="Tényleges letöltési sávszélesség"
 Peh="Tényleges feltöltési sávszélesség"
-Pei="BrazilFW QOS init scriptek beállítása"
+Pei="Smart Router QOS init scriptek beállítása"
 Pej="A router"
 Pek="inet class közötti forgalomnak fenntartott sávszélesség"
 Pel="Prioritásos class-oknak fentartott sávszélesség"
@@ -490,7 +477,7 @@ Phs="Egy"
 Pht="Érvényes Class ID-t kell beállítani szülõnek ehhez a class-hoz."
 Phu="Ezen class ID-je."
 Phv="Adja meg, mekkora sávszélességet kíván fenntartani ennek a class-nak (kbit/s)"
-Phw="vagy válassza a GÉPENKÉNTI/TELJES-t, hogy a BrazilFW kiszámíthassa."
+Phw="vagy válassza a GÉPENKÉNTI/TELJES-t, hogy a Smart Router kiszámíthassa."
 Phx="Gépenkénti letöltés"
 Phy="Teljes letöltés"
 Phz="Adja meg, mekkora sávszélességet engedélyez ennek a class-nak (kbit/s)"
@@ -525,7 +512,7 @@ Pzb="Speciális letöltési class-ok"
 Pzc="Direct router-&gt;localnet data"
 Pzd="Aktuális Downstream traffic control classes"
 Pze="Aktuális Upstream traffic control classes"
-Pzf="Kizárólag a BrazilFW QOS init scriptekhez használható."
+Pzf="Kizárólag a Smart Router QOS init scriptekhez használható."
 # file chpasswd.cgi
 Caa="Nem hagyhatja üresen a jelszó helyét. A jelszó nem került frissítésre."
 Cab="A jelszavak nem egyeznek. A jelszó nem került frissítésre."
@@ -533,7 +520,7 @@ Cab="A jelszavak nem egyeznek. A jelszó nem került frissítésre."
 Pja="A következõk lettek szerkesztve: "
 Pjb="Konfigurációs file-ok"
 Pjc="A szerkesztendõ file neve:"
-Pjd="BrazilFW fõkonfigurációs file"
+Pjd="Smart Router fõkonfigurációs file"
 Pje="Port forward beállítások"
 Pjf="Tûzfal beállítások"
 Pjg="Saját tûzfal szabályok"
@@ -551,7 +538,7 @@ Pjr="PPP CHAP Secrets"
 Pjt="Egyéb file szerkesztése"
 # file diags.cgi
 Pka="Rendszernapló olvasása"
-Pkb="BrazilFW beállítások megnézése"
+Pkb="Smart Router beállítások megnézése"
 Pkc="Futó processek"
 Pkd="Name szerver felderítése"
 Pke="Hálózati csatolók állapota"
@@ -597,12 +584,12 @@ Pme="ISP Statikus IP:"
 Pmf="Dinamikus IP"
 Pmg="Helyi kapott IP:"
 Pmh="FIGYELMEZTETÉS: Érvényes internet felhasználónevet és jelszót kell megadnia."
-Pmi="A BrazilFW ezek nélkül feltehetõleg nem tud bejelentkezni az internet-szolgáltatójához."
+Pmi="A Smart Router ezek nélkül feltehetõleg nem tud bejelentkezni az internet-szolgáltatójához."
 Pmj="FIGYELMEZTETÉS: Meg kell adnia az internet-szolgáltatója telefonszámát."
-Pmk="Enélkül a BrazilFW nem tud betárcsázni a szolgáltatóhoz."
+Pmk="Enélkül a Smart Router nem tud betárcsázni a szolgáltatóhoz."
 Pml="FIGYELMEZTETÉS: Meg kell adnia mely eszközön keresztül csatlakozik a modeme (pl ttyS0 a com1...)."
-Pmm="BrazilFW anélkül nem tud kommunikálni a modemével, hogy ne adná meg neki a modem csatlakozásának helyét."
-Pmn="FIGYELMEZTETÉS: LOCALREMOTE címe üres, így a BrazilFW nem tud mûködni!"
+Pmm="Smart Router anélkül nem tud kommunikálni a modemével, hogy ne adná meg neki a modem csatlakozásának helyét."
+Pmn="FIGYELMEZTETÉS: LOCALREMOTE címe üres, így a Smart Router nem tud mûködni!"
 Pmo="adjon meg neki egy a LAN-ján lévõ címet az <i>Internet beállítások</i> oldalon"
 Pmp="FIGYELMEZTETÉS: LOCALREMOTE címe már nincs ugyanazon a LAN-on!"
 Pmq="Írja be újra az <i>Internet beállítások</i> lapon vagy cserélje le a <i>LAN beállítások</i>-at és a <i>DHCP beállítások</i>-at, hogy egyezzen."

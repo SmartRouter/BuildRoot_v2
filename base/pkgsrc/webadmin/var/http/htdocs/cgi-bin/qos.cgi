@@ -5,7 +5,7 @@
 . /etc/qos.config
 . /etc/coyote/coyote.conf
 RELOAD="/etc/rc.d/rc.qos"
-cl_header2 "$Mqc - BrazilFW"
+cl_header2 "$Mqc - SmartRouter"
 if ! [ "$FORM_OKBTN" = "$Fsv" ] && [ -z $FORM_ACTION ]; then
 #----------------------------------------------HTML---------------------------------------------------
 CHK1=

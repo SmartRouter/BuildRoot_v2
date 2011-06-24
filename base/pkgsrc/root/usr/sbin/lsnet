@@ -2,8 +2,7 @@
 
 ###########################################################
 # LSNET - Network Device 1.3 by Washington Rodrigues 2008 #
-# Alteraçao na linha nº 53 ----    05/04/2010             #
-# By coidiloco - reportado por thiagofw
+# Corrigido      por   thiagofw    05/04/2010             #
 ###########################################################
 IRQC=0
 IOHA=0
@@ -13,9 +12,8 @@ NETWORK=`/sbin/lshw -disable ide -disable cpuid -C network -xml 2>/dev/null`
 if [ "$1" != "-short" ]; then
    echo "Loading information..." >&2
    echo "" >&2
-   echo " LSNET - Network Device 1.3 by Washington Rodrigues 2008 "
-   echo " LSNET - Script com Correçao na linha 53 tanks coidiloco "
-   echo "========================================================="
+   echo " LSNET - Network Device 1.3  "
+   echo "============================="
    echo
 fi
 
@@ -55,8 +53,9 @@ COUNT=0
 #set -vx
 #echo "$NETWORK" | grep -i "<physid\>" | sed s/[^0123456789]//g | sort | while read PHYSICAL; do
 echo "$NETWORK" | grep -i "<physid\>" | sed s/[^0123456789abcef]//g | sort | while read PHYSICAL; do
+          if [ ! -z $PHYSICAL ]; then           
                 LN=`echo "$NETWORK" | grep -n "" | grep -i "<physid>$PHYSICAL" | cut -f1 -d":"`
-                POSEND=$((LN+100))
+                POSEND=$((LN + 100))
 #set +vx
                 for POS in $(seq $LN -1 0); do
                     POS=`echo "$NETWORK" | grep -n "" | grep -i "^$POS:" | grep -i "<node id" | cut -f1 -d":"`
@@ -82,6 +81,7 @@ echo "$NETWORK" | grep -i "<physid\>" | sed s/[^0123456789abcef]//g | sort | whi
                    DRIVER="$(get_value "driver")"
                    IRQ="$(get_resource "irq")"
                    IOPORT="$(get_resource "ioport")"; [ "$IOPORT" = "UNKNOWN" ] && IOHA=$((IOHA+1))
+                   [ -z "$IOPORT" ] && IOPORT="N/A"
                    DEVICEID="$PHYSICAL"
                    VENDOR="$(get_dat "vendor")"
                    MODEL="$(get_dat "product")"
@@ -93,13 +93,11 @@ echo "$NETWORK" | grep -i "<physid\>" | sed s/[^0123456789abcef]//g | sort | whi
                    [ -z "$SPEED" ] && SPEED="UNKNOWN"
                    ethinfo "$INTERFACE"
 
-                   [ -z "$IOPORT" ] && IOPORT="N/A"
+                   
                    if [ "$1" != "-short" ]; then
                       if [ -z "$IRQ" ]; then
                          IRQ="N/A";IRQC=$((IRQC+1))
                       fi
-                   fi 
-                   if [ "$1" != "-short" ]; then
                       echo "Device ID....: $DEVICEID"
                       echo "Vendor.......: $VENDOR"
                       echo "Model........: $MODEL"
@@ -129,6 +127,7 @@ echo "$NETWORK" | grep -i "<physid\>" | sed s/[^0123456789abcef]//g | sort | whi
                       echo "$MACE" > /tmp/lsnet.mace
                    fi
                 fi
+fi                
 done
 if [ "$1" != "-short" ]; then
    echo

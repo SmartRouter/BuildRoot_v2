@@ -25,7 +25,7 @@ echo -n > $MAC_BLACK_LIST
 echo -n > $MAC_WHITE_LIST
 echo -n > $PROTOCOLS_LIST
 echo -n > $IP_MAC_LIST
-cl_header2 "$Msf - BrazilFW"
+cl_header2 "$Msf - SmartRouter"
 
  init_table "maintable"
  init_add_control "$Egf"

@@ -4,7 +4,7 @@
 #################################################
 
 DIALOG=${DIALOG=dialog}
-TITLE_WINDOW="BrazilFW Firewall and Router -- System Password"
+TITLE_WINDOW="SmartRouter Project -- System Password"
 passwd1=$(
 $DIALOG --stdout \
         --backtitle "$TITLE_WINDOW" \

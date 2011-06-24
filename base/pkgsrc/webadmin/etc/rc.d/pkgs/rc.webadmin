@@ -18,7 +18,7 @@ auth.backend = \"htpasswd\"
 auth.backend.htpasswd.userfile = \"/var/http/htdocs/cgi-bin/.htpasswd\"
 auth.require = ( \"/cgi-bin/\" => (
 			\"method\"  => \"basic\",
-			\"realm\"   => \"BrazilFW Administration Panel\",
+			\"realm\"   => \"SmartRouter Administration Panel\",
 			\"require\" => \"valid-user\"
 			)
 )

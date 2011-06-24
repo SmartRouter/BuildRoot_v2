@@ -6,10 +6,12 @@ if [ -f /etc/dhcpc/$IF_INET.info ] ; then
   . /etc/dhcpc/$IF_INET.info
   eval `ipcalc -m $dhcp_ip/$dhcp_mask`
 fi
-cl_header2 "BrazilFW - $MWE"
+
+#Environment variables
+VEL=`grep MHz /proc/cpuinfo | cut -f 2 -d ':' | uniq ; echo "GHz"`
 VERSION=`cat /var/lib/lrpkg/root.version`
 KERNEL=`uname -r`
-MACHINE=`cat /proc/cpuinfo | grep name | cut -f 2 -d ':'; cat /proc/cpuinfo | grep MHz | cut -f 2 -d ':'`
+MACHINE=$(grep "model name" /proc/cpuinfo | cut -f 2 -d ':' | uniq ; grep MHz /proc/cpuinfo | cut -f 2 -d ':' | uniq ; echo "MHz" ; echo "(`grep -ci "model name" /proc/cpuinfo` x)")
 HOST=`hostname`
 NOW=`date`
 UPTIME=`uptime | cut -b 14-100 | cut -f 1 -d ','`
@@ -22,6 +24,7 @@ MEMUSED=`free | grep Mem | sed s/\ */#/g | cut -f 4 -d '#'`
 MEMFREE=`free | grep Mem | sed s/\ */#/g | cut -f 5 -d '#'`
 PERCUSED=$((MEMUSED*100/MEMTOTAL))
 PERCFREE=$((100-$PERCUSED))
+#SECOND PART
 if [ "$INETTYPE" = "ETHERNET_DHCP" ] ; then
  [ -e "/etc/dhcpc/$IF_INET.info" ] && . /etc/dhcpc/$IF_INET.info
 fi
@@ -66,11 +69,86 @@ WEBADMSTATUS=$Abj
 [ "$WLAN_UP" = "DOWN" ] && LWLAN_UP=$Abn
 [ "$WLAN_UP" = "READY" ] && LWLAN_UP=$Abo
 
+
+cpu_info() {
+CPUINFO="$(cat /proc/cpuinfo)"
+CPUCOUNT=$(echo "$CPUINFO" | grep -ci "model name")
+MODEL=$(echo "$CPUINFO" | grep "model name" | uniq | cut -f2 -d":" | sed s/@.*//g)
+VELOCITY=$(echo "$CPUINFO" | grep "cpu MHz" | uniq | cut -f2 -d":" | awk '{iint=int($0);fra=$0-iint;if (fra >= .4) iint=iint+1;if (iint > 999) print (iint/1000)" GHz" ;else print iint" MHz" }')
+echo $MODEL @ "($CPUCOUNT"x")" $VELOCITY
+}
+
+color() {
+     case $1 in
+          1) COLOR="008000";;
+          2) COLOR="FF0000";;
+          3) COLOR="00FF00";;
+          4) COLOR="800000";;
+          5) COLOR="008080";;
+          6) COLOR="000080";;
+          7) COLOR="FF69B4";;
+          8) COLOR="0000FF";;
+          *) COLOR="000000";;
+     esac
+     echo "#$COLOR"
+}
+
+create_cpu_graph() {
+ /bin/rrdtool graph /var/http/htdocs/cgi-bin/graph/cpu/cpu.png -a PNG -t "$(cpu_info)" \
+ -v "$Ala / $Amu %" -s -24hours -r -w 593 -h 180 --alt-autoscale-max -l 0 -u 100 -r \
+ DEF:memory=/tmp/cpu.rrd:memory:AVERAGE \
+ DEF:used=/tmp/cpu.rrd:use:AVERAGE \
+ $(for x in $(seq 1 $(cat /proc/stat | grep "cpu[0-9]" | wc -l));do echo "DEF:cpu$x=/tmp/cpu.rrd:cpu$x:AVERAGE "; done) \
+ CDEF:memo=memory \
+ CDEF:mem_mb=used \
+ $(for x in $(seq 1 $CPUCOUNT);do echo "CDEF:cpuvar$x=cpu$x "; done) \
+ AREA:memo#D9D900:"$Amu" \
+ GPRINT:mem_mb:MIN:"Min\: %8.2lf mb" \
+ GPRINT:mem_mb:AVERAGE:"Average\: %8.2lf mb" \
+ GPRINT:mem_mb:MAX:"Max\: %8.2lf mb" \
+ GPRINT:mem_mb:LAST:"Current\: %8.2lf mb\n" \
+ $(for x in $(seq 1 $(cat /proc/stat | grep "cpu[0-9]" | wc -l));do echo "LINE1:cpu$x$(color $x):cpu$x\n ";done) >/dev/null 2>&1 
+}
+
+list_language(){
+IFS=#
+ cat /var/language/langlist | while read CODLANG LANGUAGE ; do
+ codlang="`echo $CODLANG | tr [A-Z] [a-z]`"
+ [ -r /var/language/webadmin.${codlang} ] && echo "<option value=$CODLANG `[ "$LANGUAGE_WEBADMIN" = "$CODLANG" ] && echo selected`>$LANGUAGE</option>"
+ done
+IFS=":
+ "
+}
+
+add_info_item_form(){
+if [ -z $3 ];then
+echo "<tr>
+ <td width=50% colspan=2 class=row1 align=right><b>$1</b></td>
+ <td width=50% colspan=2 class=row2>$2</td>
+</tr>"
+else
+echo "<tr>
+ <td colspan=2 class=row1 align=right><b>$1</b></td>
+ <td width=25% class=row2><span id=`get_color $2`>$2</span></td>
+ <td width=25% class=row2>$3</td>
+</tr>"
+fi
+}
+
+add_info_item_form_2(){
+echo "<tr>
+ <td colspan=2 class=row1 align=right><b>$1</b></td>
+ <td width=25% class=row2>$2</td>
+ <td width=25% class=row2>$3</td>
+</tr>"
+}
+
 PPPIP=`getifaddr ppp0`
 [ "$INETTYPE" = "PPPOE" -o "$INETTYPE" = "PPP" ] && GW=`ifconfig ppp0 | grep P-t-P | cut -f3 -d: | cut -f1 -d" "` \
 || GW=`/usr/sbin/ip route show | grep default | cut -f 3 -d ' '`
 /usr/sbin/ip.test -i > /dev/null 2> /dev/null
 [ $? != 0 ] && IPSTATUS=$Ptc || IPSTATUS=$Ptb
+
 get_color() {
  case "$1" in
 	"$Abm")	echo "Green";;
@@ -83,254 +161,155 @@ get_color() {
  esac
 }
 
+#INIT MAIN
+
+cl_header2 "SmartRouter - $MWE"
+create_cpu_graph
+
 if [ "$FORM_OKBTN" = "$Fsb" ]; then
  LANGUAGE_WEBADMIN=$FORM_LANGUAGE_WEBADMIN
  cl_rebuildconf
- echo "<br><center><div id=back><a href=index.cgi class=links>$Egj</a><br></div>
- <br><div id=alerta><a href=backup.cgi class=links>$Wtl</a></div></center>"
-else
+  echo "<center><div id=alerta><a href=index.cgi class=lnk><u>$Egj</u></a><br>
+<a href=backup.cgi class=lnk><u>$Wtl</u></a></div></center><br>"
+fi
 
-cat << CLEOF
-<form method="POST"><table class=maintable width=100%><tr><th colspan=4 align=center class=row1>$Agi</th></tr>
+init_form
+init_main_table
+#GENERAL INFORMATION
+ add_title "$Agi" "4"
+ add_info_item_form "$Baj" "$(init_combobox \"LANGUAGE_WEBADMIN\") $(list_language) $(end_combobox) $(echo "<input type=submit value=\"$Fsb\" name=OKBTN>")"
+ add_info_item_form "SmartRouter - $Avs" "$VERSION"
+ add_info_item_form "$Ahs" "$HOST"
+ add_info_item_form "$Adn" "$DOMAINNAME"
+ add_info_item_form "$Pta" "$IPSTATUS" "[ <a href=\"diags.cgi?COMMAND=/usr/sbin/ip.test%20-w\"><u>$Ptd</u></a> ]"
 
-<tr><td width=50% colspan=2 class=row1 align=right><b>$Baj</b><br><small></small></td>
- <td width=50% colspan=2 class=row2><select name=LANGUAGE_WEBADMIN>
-CLEOF
-IFS=#
- cat /var/language/langlist | while read CODLANG LANGUAGE ; do
- codlang="`echo $CODLANG | tr [A-Z] [a-z]`"
- [ -r /var/language/webadmin.${codlang} ] && echo "<option value=$CODLANG `[ "$LANGUAGE_WEBADMIN" = "$CODLANG" ] && echo selected`>$LANGUAGE</option>"
- done
-IFS=":
- "
-cat << CLEOF
-</select><input type=submit value="$Fsb" name=OKBTN></td></tr>
-<tr><td width=50% colspan=2 class=row1 align=right><b>BrazilFW - $Avs</b></td>
-<td width=50% colspan=2 class=row2>$VERSION</td></tr><tr><td colspan=2 class=row1 align=right><b>$Ahs</b></td><td colspan=2 class=row2>$HOST</td></tr>
-<tr><td colspan=2 class=row1 align=right><b>$Adn</b></td><td colspan=2 class=row2>$DOMAINNAME</td>
-<tr><td colspan=2 class=row1 align=right><b>$Pta</b></td>
-<td class=row2 width=25%><span id=`get_color $IPSTATUS`>$IPSTATUS</span></td>
-<td width=25% class=row2>[ <a href="diags.cgi?COMMAND=/usr/sbin/ip.test%20-w"><u>$Ptd</u></a> ]</td>
-</tr><tr><th colspan=4>$Ans - $Ani</th></tr>
-CLEOF
+#WAN - FIRST
+add_title "$Ans - $Ani" "4"
 case "$INETTYPE" in
  ETHERNET_STATIC)
-cat << CLEOF
- <tr><td colspan=2 class=row1 align=right><b>$Ast</b></td>
- <td class=row2><span id=`get_color $LINET_UP`>$LINET_UP</span></td><td class=row2></td></tr>
- <tr><td colspan=2 class=row1 align=right><b>$Ait</b></td>
- <td colspan=2 class=row2>$INTERNET_TYPE</td></tr>
- <tr><td colspan=2 class=row1 align=right><b>$Aei</b></td>
- <td colspan=2 class=row2>$IPADDR</td></tr>
-CLEOF
- if [ -n "$IPADDR2" ] ; then
-	echo "<tr><td colspan=2 class=row1 align=right><b>$And $Aei</b></td>
-	<td colspan=2 class=row2>$IPADDR2/$NETMASK2</td></tr>"
- fi
- if [ -n "$IPADDR3" ] ; then
-	echo "<tr><td colspan=2 class=row1 align=right><b>$Ard $Aei</b></td>
-	<td colspan=2 class=row2>$IPADDR3/$NETMASK3</td></tr>"
- fi
-cat << CLEOF
- <tr><td colspan=2 class=row1 align=right><b>$Anm</b></td>
- <td colspan=2 class=row2>$NETMASK</td></tr>
- <tr><td colspan=2 class=row1 align=right><b>$Agt</b></td>
- <td width=25% class=row2>$GATEWAY</td>
- <td width=25% class=row2>[ <a href=diags.cgi?COMMAND=/usr/sbin/gateway.test><u>$Abf</u></a> ]</td></tr>
-CLEOF
+ add_info_item_form "$Ast" "$LINET_UP"
+ add_info_item_form "$Ait" "$INTERNET_TYPE"
+ add_info_item_form "$Aei" "$IPADDR"
+ [ -n "$IPADDR2" ] && add_info_item_form "$And $Aei" "$IPADDR2/$NETMASK2"
+ [ -n "$IPADDR3" ] && add_info_item_form "$Ard $Aei" "$IPADDR3/$NETMASK3"
+ add_info_item_form "$Anm" "$NETMASK"
+ add_info_item_form_2 "$Agt" "$GATEWAY" "[ <a href=diags.cgi?COMMAND=/usr/sbin/gateway.test><u>$Abf</u></a> ]"
  ;;
  ETHERNET_DHCP)
-cat << CLEOF
- <tr><td colspan=2 class=row1 align=right><b>$Ast</b></td>
- <td width=25% class=row2><span id=`get_color $LINET_UP`>$LINET_UP</span></td>
- <td width=25% class=row2>[ <a href=diags.cgi?COMMAND=/usr/sbin/dhcp.release><u>$Abh</u></a>&nbsp; |&nbsp;
- <a href=diags.cgi?COMMAND=/usr/sbin/dhcp.renew><u>$Abi</u></a> ]</td></tr>
- <tr><td colspan=2 class=row1 align=right><b>$Ait</b></td>
- <td colspan=2 class=row2>$INTERNET_TYPE</td></tr>
-CLEOF
+ add_info_item_form "$Ast" "$LINET_UP" "[ <a href=diags.cgi?COMMAND=/usr/sbin/dhcp.release><u>$Abh</u></a> | <a href=diags.cgi?COMMAND=/usr/sbin/dhcp.renew><u>$Abi</u></a> ]"
+ add_info_item_form "$Ait" "$INTERNET_TYPE"
   if [ -n "$dhcp_ip" ] ; then
-cat << CLEOF
- <tr><td colspan=2 class=row1 align=right><b>$Aei</b></td>
- <td colspan=2 class=row2>$dhcp_ip</td>
- <tr><td colspan=2 class=row1 align=right><b>$Anm</b></td>
- <td colspan=2 class=row2>$NETMASK</td></tr>
- <tr><td colspan=2 class=row1 align=right><b>$Agt</b></td>
- <td width=25% class=row2>$dhcp_router</td>
- <td width=25% class=row2>[ <a href=diags.cgi?COMMAND=/usr/sbin/gateway.test><u>$Abf</u></a> ]</td></tr>
-CLEOF
+  add_info_item_form "$Aei" "$dhcp_ip"
+  add_info_item_form "$Anm" "$NETMASK"
+  add_info_item_form_2 "$Agt" "$dhcp_router" "[ <a href=diags.cgi?COMMAND=/usr/sbin/gateway.test><u>$Abf</u></a> ]"
   fi
  ;;
   PPP*)
-cat << CLEOF
- <tr><td colspan=2 class=row1 align=right><b>$Ast</b></td>
- <td width=25% class=row2><span id=`get_color $LINET_UP`>$LINET_UP</span></td>
- <td width=25% class=row2>[ <a href=dial-ppp.cgi><u>$Mdl</u></a>&nbsp; |&nbsp;
- <a href=hangup-ppp.cgi><u>$Mhg</u></a> ]</td></tr>
- <tr><td colspan=2 class=row1 align=right><b>$Ait</b></td>
- <td colspan=2 class=row2>$INTERNET_TYPE</td></tr>
- <tr><td colspan=2 class=row1 align=right><b>$Aei</b></td>
- <td colspan=2 class=row2>$PPPIP</td></tr>
-CLEOF
- [ -n "$CONNECTTIME" ] && echo "<tr><td colspan=2 class=row1 align=right><b>$Acs</b></td> \
-	<td colspan=2 class=row2>$CONNECTTIME</td></tr>"
- [ -n "$CONNECTSTRING" ] && echo "<tr><td colspan=2 class=row1 align=right><b>$Act</b></td> \
-	<td colspan=2 class=row2>$CONNECTSTRING</td></tr>"
- [ -n "$GW" ] && echo "<tr><td colspan=2 class=row1 align=right><b>$Agt</b></td> \
-	<td width=25% class=row2>$GW</td> \
-	<td width=25% class=row2>[ <a href=diags.cgi?COMMAND=/usr/sbin/gateway.test><u>$Abf</u></a> ]</td></tr>"
+  add_info_item_form "$Ast" "$LINET_UP" "[ <a href=dial-ppp.cgi><u>$Mdl</u></a> | <a href=hangup-ppp.cgi><u>$Mhg</u></a> ]"
+  add_info_item_form "$Ait" "$INTERNET_TYPE"
+  add_info_item_form "$Aei" "$PPPIP"
+ [ -n "$CONNECTTIME" ] && add_info_item_form "$Acs" "$CONNECTTIME"
+ [ -n "$CONNECTSTRING" ] && add_info_item_form "$Act" "$CONNECTSTRING"
+ [ -n "$GW" ] && add_info_item_form_2 "$Agt" "$GW" "[ <a href=diags.cgi?COMMAND=/usr/sbin/gateway.test><u>$Abf</u></a> ]"
  ;;
 esac
-echo "<tr><th colspan=4>$Ans - $Aln</th></tr>"
-echo "<tr><td colspan=2 class=row1 align=right><b>$Ast</b></td>"
-echo "<td class=row2><span id=`get_color $LLOCAL_UP`>$LLOCAL_UP</span></td><td class=row2></td></tr>"
-echo "<tr><td colspan=2 class=row1 align=right><b>$Ali</b></td>"
-echo "<td colspan=2 class=row2>$LOCAL_IPADDR</td></tr>"
-[ -n "$LOCAL_IPADDR2" ] &&  echo "<tr><td colspan=2 class=row1 align=right><b>$And $Ali</b></td> \
- <td colspan=2 class=row2>$LOCAL_IPADDR2 / $LOCAL_NETMASK2</td></tr>"
-[ -n "$LOCAL_IPADDR3" ] && echo "<tr><td colspan=2 class=row1 align=right><b>$Ard $Ali</b></td> \
- <td colspan=2 class=row2>$LOCAL_IPADDR3 / $LOCAL_NETMASK3</td></tr>"
-echo "<tr><td colspan=2 class=row1 align=right><b>$Anm</b></td>
- <td colspan=2 class=row2>$LOCAL_NETMASK</td></tr>"
 
+
+#LAN - FIRST
+add_title "$Ans - $Aln" "4"
+ add_info_item_form "$Ast" "$LLOCAL_UP" "<a></a>"
+ add_info_item_form "$Ali" "$LOCAL_IPADDR"
+ add_info_item_form "$Anm" "$LOCAL_NETMASK"
+[ -n "$LOCAL_IPADDR2" ] && add_info_item_form "$And $Ali" "$LOCAL_IPADDR2 / $LOCAL_NETMASK2"
+[ -n "$LOCAL_IPADDR3" ] && add_info_item_form "$Ard $Ali" "$LOCAL_IPADDR3 / $LOCAL_NETMASK3"
+
+#SECOND LAN
 if [ -n "$LOCAL2_UP" ] ; then
-  echo "<tr><th colspan=4>$Ans - $Pua</th></tr>"
-  echo "<tr><td colspan=2 class=row1 align=right><b>$Ast</b></td>"
-  echo "<td class=row2><span id=`get_color $LLOCAL2_UP`>$LLOCAL2_UP</span></td><td class=row2></td></tr>"
-  echo "<tr><td colspan=2 class=row1 align=right><b>LAN2 $Aip</b></td>"
-  echo "<td colspan=2 class=row2>$LOCAL2_IPADDR</td></tr>"
-  echo "<tr><td colspan=2 class=row1 align=right><b>$Anm</b></td>
-  <td colspan=2 class=row2>$LOCAL2_NETMASK</td></tr>"
+add_title "$Ans - $Pua" "4"
+ add_info_item_form "$Ast" "$LLOCAL2_UP" "<a></a>"
+ add_info_item_form "LAN2 $Aip" "$LOCAL2_IPADDR"
+ add_info_item_form "$Anm" "$LOCAL2_NETMASK"
 fi
-
+#THIRD LAN
 if [ -n "$LOCAL3_UP" ] ; then
-  echo "<tr><th colspan=4>$Ans - $Pub</th></tr>"
-  echo "<tr><td colspan=2 class=row1 align=right><b>$Ast</b></td>"
-  echo "<td class=row2><span id=`get_color $LLOCAL3_UP`>$LLOCAL3_UP</span></td><td class=row2></td></tr>"
-  echo "<tr><td colspan=2 class=row1 align=right><b>LAN3 $Aip</b></td>"
-  echo "<td colspan=2 class=row2>$LOCAL3_IPADDR</td></tr>"
-  echo "<tr><td colspan=2 class=row1 align=right><b>$Anm</b></td>
-  <td colspan=2 class=row2>$LOCAL3_NETMASK</td></tr>"
+add_title "$Ans - $Pub" "4"
+ add_info_item_form "$Ast" "$LLOCAL3_UP" "<a></a>"
+ add_info_item_form "LAN3 $Aip" "$LOCAL3_IPADDR"
+ add_info_item_form "$Anm" "$LOCAL3_NETMASK"
 fi
-
+#FOURTH LAN
 if [ -n "$LOCAL4_UP" ] ; then
-  echo "<tr><th colspan=4>$Ans - $Puc</th></tr>"
-  echo "<tr><td colspan=2 class=row1 align=right><b>$Ast</b></td>"
-  echo "<td class=row2><span id=`get_color $LLOCAL4_UP`>$LLOCAL4_UP</span></td><td class=row2></td></tr>"
-  echo "<tr><td colspan=2 class=row1 align=right><b>LAN4 $Aip</b></td>"
-  echo "<td colspan=2 class=row2>$LOCAL4_IPADDR</td></tr>"
-  echo "<tr><td colspan=2 class=row1 align=right><b>$Anm</b></td>
-  <td colspan=2 class=row2>$LOCAL4_NETMASK</td></tr>"
+add_title "$Ans - $Puc" "4"
+ add_info_item_form "$Ast" "$LLOCAL4_UP" "<a></a>"
+ add_info_item_form "LAN4 $Aip" "$LOCAL4_IPADDR"
+ add_info_item_form "$Anm" "$LOCAL4_NETMASK"
 fi
 
+#WLAN
 if [ -n "$WLAN_UP" ] ; then
-  echo "<tr><th colspan=4>$Ans - $Pud</th></tr>"
-  echo "<tr><td colspan=2 class=row1 align=right><b>$Ast</b></td>"
-  echo "<td class=row2><span id=`get_color $LWLAN_UP`>$LWLAN_UP</span></td><td class=row2></td></tr>"
-  echo "<tr><td colspan=2 class=row1 align=right><b>WLAN $Aip</b></td>"
-  echo "<td colspan=2 class=row2>$WLAN_IPADDR</td></tr>"
-  echo "<tr><td colspan=2 class=row1 align=right><b>$Anm</b></td>
-  <td colspan=2 class=row2>$WLAN_NETMASK</td></tr>"
+add_title "$Ans - $Pud" "4"
+ add_info_item_form "$Ast" "$LWLAN_UP" "<a></a>"
+ add_info_item_form "WLAN $Aip" "$WLAN_IPADDR"
+ add_info_item_form "$Anm" "$WLAN_NETMASK"
 fi
-
+ 
+#DMZ
 if [ -n "$DMZ_UP" ] ; then
-  echo "<tr><th colspan=4>$Ans - $Adz</th></tr>"
-  echo "<tr><td colspan=2 class=row1 align=right><b>$Ast</b></td>"
-  echo "<td class=row2><span id=`get_color $LDMZ_UP`>$LDMZ_UP</span></td><td class=row2></td></tr>"
-  echo "<tr><td colspan=2 class=row1 align=right><b>DMZ $Aip</b></td>"
-  echo "<td colspan=2 class=row2>$DMZ_IPADDR</td></tr>"
-  [ -n "$DMZ_IPADDR2" ] && echo "<tr><td colspan=2 class=row1 align=right><b>$And DMZ $Aip</b></td> \
-	<td colspan=2 class=row2>$DMZ_IPADDR2 / $DMZ_NETMASK2</td></tr>"
-  [ -n "$DMZ_IPADDR3" ] && echo "<tr><td colspan=2 class=row1 align=right><b>$Ard DMZ $Aip</b></td> \
-	<td colspan=2 class=row2>$DMZ_IPADDR3 / $DMZ_NETMASK3</td></tr>"
-  echo "<tr><td colspan=2 class=row1 align=right><b>$Anm</b></td>
-  <td colspan=2 class=row2>$DMZ_NETMASK</td></tr>"
+add_title "$Ans - $Adz" "4"
+ add_info_item_form "$Ast" "$LDMZ_UP" "<a></a>"
+ add_info_item_form "DMZ $Aip" "$DMZ_IPADDR"
+ add_info_item_form "$Anm" "$DMZ_NETMASK"
+ [ -n "$DMZ_IPADDR2" ] && add_info_item_form "$And DMZ $Aip" "$DMZ_IPADDR2 / $DMZ_NETMASK2"
+ [ -n "$DMZ_IPADDR3" ] && add_info_item_form "$Ard DMZ $Aip" "$DMZ_IPADDR3 / $DMZ_NETMASK3"
 fi
+ 
+#DNS
+add_title "$Adi" "4"
+[ -e "/tmp/realdns1" ] && add_info_item_form_2 "$Apn" "`cat /tmp/realdns1`" "[ <a href=diags.cgi?COMMAND=/usr/sbin/dns.test><u>$Abg</u></a> ]"
+[ -e "/tmp/realdns2" ] && add_info_item_form "$Asn" "`cat /tmp/realdns2`"
+[ -e "/tmp/realdns3" ] && add_info_item_form "$Atn" "`cat /tmp/realdns3`"
 
-echo "<tr><th colspan=4>$Adi</th></tr>"
-[ -e "/tmp/realdns1" ] && echo "<tr><td colspan=2 class=row1 align=right><b>$Apn</b></td> \
- <td width=25% class=row2>`cat /tmp/realdns1`</td> \
- <td width=25% class=row2>[ <a href=diags.cgi?COMMAND=/usr/sbin/dns.test><u>$Abg</u></a> ]</td></tr>"
-[ -e "/tmp/realdns2" ] && echo "<tr><td colspan=2 class=row1 align=right><b>$Asn</b></td> \
- <td colspan=2 class=row2>`cat /tmp/realdns2`</td></tr>"
-[ -e "/tmp/realdns3" ] && echo "<tr><td colspan=2 class=row1 align=right><b>$Atn</b></td> \
- <td colspan=2 class=row2>`cat /tmp/realdns3`</td></tr>"
+ #SYSTEM INFORMATION
+add_title "$Asv" "4"
+ add_info_item_form "$Adc" "$DNSSTATUS" "$([ "$DNSSTATUS" = "$Abj" ] && echo "[ <a href=diags.cgi?COMMAND=/etc/rc.d/rc.dnsmasq><u>$Fay</u></a> ]")<a></a>"
+ add_info_item_form "$Ads" "$DHCPSTATUS" "$([ "$DHCPSTATUS" = "$Abj" ] && echo "[ <a href=diags.cgi?COMMAND=/etc/rc.d/rc.dnsmasq><u>$Fay</u></a> ]")<a></a>"
+ add_info_item_form "$Ass" "$SSHSTATUS" "$([ "$SSHSTATUS" != "Disabled" ] && echo " ($Abe $SSH_PORT)")<a></a>"
+ add_info_item_form "$Awa" "$WEBADMSTATUS" "$([ "$WEBADMSTATUS" = "$Abj" ] && echo " ($Abe $WEBADMIN_PORT)")<a></a>"
+ add_info_item_form "$Msg" "$CRONSTATUS" "$([ "$CRONSTATUS" = "$Abj" ] && echo "[ <a href=diags.cgi?COMMAND=/usr/sbin/cron.reload><u>$Fay</u></a> ]")<a></a>"
 
-echo "<tr><th colspan=4>$Asv</th></tr>"
-echo "<tr><td colspan=2 class=row1 align=right><b>$Adc</b></td>"
-echo "<td width=25% class=row2><span id=`get_color $DNSSTATUS`>$DNSSTATUS</span></td>"
-echo "<td width=25% class=row2>"
-[ "$DNSSTATUS" = "$Abj" ] && echo "[ <a href=diags.cgi?COMMAND=/etc/rc.d/rc.dnsmasq><u>$Fay</u></a> ]"
-echo "&nbsp;</td></tr>"
+#INFORMATIONS OF SYSTEM
+add_title "$Asi" "4"
+ add_info_item_form "$Akv" "$KERNEL"
+ add_info_item_form "$Adt" "$NOW"
+ add_info_item_form "$Aup" "$UPTIME"
+ echo "<tr>
+ <td rowspan=3 width=35% class=row1 align=right><b>$Ala</b></td>
+ <td class=row1 align=right><b>$Abb</b></td>
+ <td colspan=2 class=row2>$LAST1</td>
+</tr>
+<tr>
+ <td class=row1 align=right><b>$Als 5 $Amn</b></td>
+ <td colspan=2 class=row2>$LAST5</td>
+</tr>
+<tr>
+ <td class=row1 align=right><b>$Als 15 $Amn</b></td>
+ <td colspan=2 class=row2>$LAST15</td>
+</tr>"
+#echo "<tr>
+# <td rowspan=3 class=row1 align=right><b>$Amu</b></td>
+# <td class=row1 align=right><b>$Abd</b></td>
+# <td colspan=2 class=row2>$MEMTOTAL kb (100%)</td>
+#</tr>
+#<tr>
+# <td class=row1 align=right><b>$Aus</b></td>
+# <td colspan=2 class=row2>$MEMUSED kb ($PERCUSED%)</td>
+#</tr>
+#<tr>
+# <td class=row1 align=right><b>$Afr</b></td>
+# <td colspan=2 class=row2>$MEMFREE kb ($PERCFREE%)</td>
+#</tr>"
+[ -e "graph/cpu/cpu.png" ] && echo "<tr><td width=\"100%\" colspan=4><div align=\"center\"><img src=\"/cgi-bin/graph/cpu/cpu.png\"></div></td></tr>"
 
-echo "<tr><td colspan=2 class=row1 align=right><b>$Ads</b></td>"
-echo "<td width=25% class=row2><span id=`get_color $DHCPSTATUS`>$DHCPSTATUS</span></td>"
-echo "<td width=25% class=row2>"
-[ "$DHCPSTATUS" = "$Abj" ] && echo "[ <a href=diags.cgi?COMMAND=/etc/rc.d/rc.dnsmasq><u>$Fay</u></a> ]"
-echo "&nbsp;</td></tr>"
+end_table
 
-echo "<tr><td colspan=2 class=row1 align=right><b>$Ass</b></td>"
-echo "<td class=row2><span id=`get_color $SSHSTATUS`>$SSHSTATUS</span></td><td class=row2>"
-[ "$SSHSTATUS" != "Disabled" ] && echo " ($Abe $SSH_PORT)"
-echo "</td></tr>"
-
-echo "<tr><td colspan=2 class=row1 align=right><b>$Awa</b></td>"
-echo "<td class=row2><span id=`get_color $WEBADMSTATUS`>$WEBADMSTATUS</span></td><td class=row2>"
-[ "$WEBADMSTATUS" = "$Abj" ] && echo " ($Abe $WEBADMIN_PORT)"
-echo "</td></tr>"
-
-echo "<tr><td colspan=2 class=row1 align=right><b>$Msg</b></td>"
-echo "<td width=25% class=row2><span id=`get_color $CRONSTATUS`>$CRONSTATUS</span></td>"
-echo "<td width=25% class=row2>"
-[ "$CRONSTATUS" = "$Abj" ] && echo "[ <a href=diags.cgi?COMMAND=/usr/sbin/cron.reload><u>$Fay</u></a> ]"
-echo "&nbsp;</td></tr>"
-
-cat << CLEOF
-<tr>
-  <th colspan=4>$Asi</th>
-</tr>   
-<tr>
-  <td colspan=2 class=row1 align=right><b>$Akv</b></td>
-  <td colspan=2 class=row2>$KERNEL</td>
-</tr>
-<tr>
-  <td colspan=2 class=row1 align=right><b>$Amc</b></td>
-  <td colspan=2 class=row2>$MACHINE</td>
-</tr>
-<tr>
-  <td colspan=2 class=row1 align=right><b>$Adt</b></td>
-  <td colspan=2 class=row2>$NOW</td>
-</tr>
-<tr>
-  <td colspan=2 class=row1 align=right><b>$Aup</b></td>
-  <td colspan=2 class=row2>$UPTIME</td>
-</tr>
-<tr>
-  <td rowspan=3 width=35% class=row1 align=right><b>$Ala</b></td>
-  <td class=row1 align=right><b>$Abb</b></td>
-  <td colspan=2 class=row2>$LAST1</td>
-</tr>
-<tr>
-  <td class=row1 align=right><b>$Als 5 $Amn</b></td>
-  <td colspan=2 class=row2>$LAST5</td>
-</tr>
-<tr>
-  <td class=row1 align=right><b>$Als 15 $Amn</b></td>
-  <td colspan=2 class=row2>$LAST15</td>
-</tr>
-<tr>
-  <td rowspan=3 class=row1 align=right><b>$Amu</b></td>
-  <td class=row1 align=right><b>$Abd</b></td>
-  <td colspan=2 class=row2>$MEMTOTAL kb (100%)</td>
-</tr>
-<tr>
-  <td class=row1 align=right><b>$Aus</b></td>
-  <td colspan=2 class=row2>$MEMUSED kb ($PERCUSED%)</td>
-</tr>
-<tr>
-  <td class=row1 align=right><b>$Afr</b></td>
-  <td colspan=2 class=row2>$MEMFREE kb ($PERCFREE%)</td>
-</tr>
-</table></center>
-CLEOF
-fi
 cl_footer2

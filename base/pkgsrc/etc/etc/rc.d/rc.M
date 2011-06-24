@@ -58,6 +58,19 @@ if [ ! -r /etc/dropbear/dropbear_rsa_host_key ]; then
 fi
 [ "$NEW_KEYS" = "YES" -a "$READONLY" = "no" ] && /usr/sbin/lrcfg.back ssh_keys
 
+echo "Set the system clock"
+if [ -z "$TZ" ]; then
+ TZ="$(cat /etc/timezone)"
+ echo "TZ=$TZ" >> /etc/coyote/coyote.conf
+else
+ echo "$TZ" > /etc/timezone
+fi
+cp /etc/timezone /etc/TZ
+export TZ
+
+# Set the clock using bios
+[ -x /sbin/hwclock ] && /sbin/hwclock -s -l
+
 # System loggers
 SYSLOG_OPTS="-m 0 -C "
 if [ ! -z "$LOGGING_HOST" ]; then

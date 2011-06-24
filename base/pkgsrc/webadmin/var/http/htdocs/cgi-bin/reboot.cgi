@@ -1,6 +1,6 @@
 #!/bin/sh
 . /var/http/web-functions
-cl_header2 "$Mpc - BrazilFW"
+cl_header2 "$Mpc - SmartRouter"
 case "$FORM_OKBTN" in
  "$Wqo")
 	echo "$Wrb ...<br>"
@@ -18,7 +18,7 @@ case "$FORM_OKBTN" in
 cat << CLEOF
 <center><form method="POST" action="/cgi-bin/reboot.cgi">${WARN_MSG}<br>
 <table class=maintable border=0 width=400>
-<tr><th>$Mpc - BrazilFW</th></tr>
+<tr><th>$Mpc - SmartRouter</th></tr>
 <tr><td id=row4 align=center><b>$Wte</b> - $Wak - <b>$Wte</b></td></tr>
 <tr><td align=center><input type=submit value="$Wqo" name=OKBTN> <input type=submit value="$Wso" name=OKBTN></td></tr>
 </table></form></center>

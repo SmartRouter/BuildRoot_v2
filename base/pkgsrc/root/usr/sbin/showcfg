@@ -11,12 +11,11 @@ if [ "$1" != "-w" ]; then
  NORM=`echo -en "\\033[0;39m"`
 fi
 
-echo "BrazilFW running configuration display utility."
-echo "-------------------------------------------------"
+echo "SmartRouter running configuration display utility."
+echo "--------------------------------------------------"
 
 # Load the master coyote configuration file
-[ -f /etc/coyote/coyote.conf ] && . /etc/coyote/coyote.conf \
- || echo "${YELLOW}ERROR${NORM}: Unable to load BrazilFW configuration file."
+[ -f /etc/coyote/coyote.conf ] && . /etc/coyote/coyote.conf \\ || echo "${YELLOW}ERROR${NORM}: Unable to load SmartRouter configuration file."
 
 # Check the status of the network subsystems
 if [ -f /tmp/netsubsys.state ]; then
@@ -172,7 +171,7 @@ status WAN; echo "----------------${STATUS}DNS configuration${NORM}-------------
 RESOLVFILE="/etc/resolv.conf"
 if [ "$USE_DNS_CACHE" = "YES" ] ; then
  RESOLVFILE="/etc/resolv.dns"
- echo "Using BrazilFW DNS Cache"
+ echo "Using SmartRouter DNS Cache"
 fi
 cat $RESOLVFILE | grep domain
 cat $RESOLVFILE | grep nameserver

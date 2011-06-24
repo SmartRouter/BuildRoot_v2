@@ -1,7 +1,7 @@
 <style type="text/css">
-BODY       {SCROLLBAR-FACE-COLOR: #dee3e7; SCROLLBAR-HIGHLIGHT-COLOR: #ffffff; SCROLLBAR-SHADOW-COLOR: #dee3e7; SCROLLBAR-3DLIGHT-COLOR: #d1d7dc; SCROLLBAR-ARROW-COLOR: #006699; SCROLLBAR-TRACK-COLOR: #efefef; SCROLLBAR-DARKSHADOW-COLOR: #98aab1; BACKGROUND-COLOR: #e5e5e5;}
+BODY       {SCROLLBAR-FACE-COLOR: #dee3e7; SCROLLBAR-HIGHLIGHT-COLOR: #ffffff; SCROLLBAR-SHADOW-COLOR: #dee3e7; SCROLLBAR-3DLIGHT-COLOR: #d1d7dc; SCROLLBAR-ARROW-COLOR: #138F34; SCROLLBAR-TRACK-COLOR: #efefef; SCROLLBAR-DARKSHADOW-COLOR: #98aab1; BACKGROUND-COLOR: #e5e5e5;}
 TH, TD, P  {FONT-FAMILY: Verdana, Arial, Helvetica, sans-serif}
-TH         {FONT-WEIGHT: bold; FONT-SIZE: 12px; COLOR: #ffa34f; HEIGHT: 25px; BACKGROUND-COLOR: #006699}
+TH         {FONT-WEIGHT: bold; FONT-SIZE: 12px; COLOR: #ABDA4D; HEIGHT: 25px; BACKGROUND-COLOR: #138F34}
 TD         {BACKGROUND-COLOR: #e5e5e5; FONT-SIZE: 12px; HEIGHT: 25px;}
 TD.header  {BACKGROUND-COLOR: #d1d7dc; text-align: center; FONT-WEIGHT: bold}
 TD.row1    {BACKGROUND-COLOR: #efefef}
@@ -10,15 +10,15 @@ TD.row3    {BACKGROUND-COLOR: #d1d7dc}
 TD.row4    {BACKGROUND-COLOR: #00AA00; color: #FFFFFF; FONT-WEIGHT: bold; text-align:center;}
 TD.row5    {BACKGROUND-COLOR: #CC0000; color: #FFFFFF; FONT-WEIGHT: bold; text-align:center;}
 TD.row6    {BACKGROUND-COLOR: #efefef; FONT-SIZE: 10px; text-align: center;}
-TD.row7    {BACKGROUND-COLOR: #006699}
+TD.row7    {BACKGROUND-COLOR: #138F34}
 TD.row8    {BACKGROUND-COLOR: #dee3e7; FONT-SIZE: 10px; text-align: center;}
-A:link     {COLOR: #006699; TEXT-DECORATION: none}
-A:active   {COLOR: #006699; TEXT-DECORATION: none}
-A:visited  {COLOR: #006699; TEXT-DECORATION: none}
-A:hover    {COLOR: #dd6900; TEXT-DECORATION: underline}
+A:link     {COLOR: #138F34; TEXT-DECORATION: none}
+A:active   {COLOR: #138F34; TEXT-DECORATION: none}
+A:visited  {COLOR: #138F34; TEXT-DECORATION: none}
+A:hover    {COLOR: #ABDA4D; TEXT-DECORATION: underline}
 PRE        {TEXT-ALIGN: left}
-.maintable {BORDER-RIGHT: #006699 2px solid; BORDER-TOP: #006699 2px solid; BORDER-LEFT: #006699 2px solid; BORDER-BOTTOM: #006699 2px solid; BACKGROUND-COLOR: #ffffff}
-.menutable {BORDER-RIGHT: #006699 2px solid; BORDER-TOP: #006699 2px solid; BORDER-LEFT: #006699 2px solid; BORDER-BOTTOM: #006699 2px solid; BACKGROUND-COLOR: #ffffff}
+.maintable {BORDER-RIGHT: #138F34 2px solid; BORDER-TOP: #138F34 2px solid; BORDER-LEFT: #138F34 2px solid; BORDER-BOTTOM: #138F34 2px solid; BACKGROUND-COLOR: #ffffff}
+.menutable {BORDER-RIGHT: #138F34 2px solid; BORDER-TOP: #138F34 2px solid; BORDER-LEFT: #138F34 2px solid; BORDER-BOTTOM: #138F34 2px solid; BACKGROUND-COLOR: #ffffff}
 .itemmenu  {BACKGROUND-COLOR: #efefef; FONT-SIZE: 11px; HEIGHT: 28}
 .tbcontent {width: 90%;}
 .middle    {text-align: center; vertical-align: top}
@@ -26,7 +26,7 @@ PRE        {TEXT-ALIGN: left}
 #textbfw   {font-weight: bold; font-size: 18; color: #000000;}
 #green     {color: #00AA00; FONT-WEIGHT: bold;text-align: center;}
 #red       {color: #CC0000; FONT-WEIGHT: bold;text-align: center;}
-#normal    {color: #ffcc44; FONT-WEIGHT: bold;text-align: center;}
+#normal    {color: #CC9911; FONT-WEIGHT: bold;text-align: center;}
 #warning   {color: #FFFFFF; background-color: #C60000; border: 1px solid #000000;width=70%;text-align: center;font-size: 14px;}
 #alerta    {color: #000000; background-color: #FFFF00; border: 1px solid #000000;width=70%;text-align: center;font-weight: bold; font-size: 12px;}
 #back      {BACKGROUND-COLOR: #EFEFEF;border: 1px solid #000000;width=70%;text-align: center;font-weight: bold; HEIGHT: 14px}

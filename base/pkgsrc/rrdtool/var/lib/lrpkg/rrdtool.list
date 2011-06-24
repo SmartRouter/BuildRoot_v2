@@ -1,0 +1,4 @@
+bin/rrdtool
+bin/rrdcgi
+lib/librrd.0
+var/lib/lrpkg/rrdtool.*

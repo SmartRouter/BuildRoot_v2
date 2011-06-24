@@ -121,16 +121,17 @@ buildall() {
   buildpkg language
   buildpkg ssh_keys
   buildpkg acpid
+  buildpkg rrdtool
   cd ..
 
   rm -rf packages
 
-  echo > ../cd/brazilfw.dpy
-  echo -n "BrazilFW Firewall and Router v" >> ../cd/brazilfw.dpy
-  cat pkgsrc/root/var/lib/lrpkg/root.version >> ../cd/brazilfw.dpy
-  echo >> ../cd/brazilfw.dpy
-  echo "http://www.brazilfw.com.br" >> ../cd/brazilfw.dpy
-  echo >> ../cd/brazilfw.dpy
+  echo > ../cd/SRP.dpy
+  echo -n "SmartRouter PROJECT v" >> ../cd/SRP.dpy
+  cat pkgsrc/root/var/lib/lrpkg/root.version >> ../cd/SRP.dpy
+  echo >> ../cd/SRP.dpy
+  echo "http://www.smartrouter.com.br" >> ../cd/SRP.dpy
+  echo >> ../cd/SRP.dpy
 }
 
 reset_all() {
@@ -138,28 +139,28 @@ reset_all() {
 
   rm -f ../cd/*.tgz 1>&2 > /dev/null
 
-  rm -f pkgsrc/modules/etc/modules
-  rm -f pkgsrc/modules/lib/modules/*.o 1>&2 > /dev/null
+  #rm -f pkgsrc/modules/etc/modules
+  #rm -f pkgsrc/modules/lib/modules/*.o 1>&2 > /dev/null
 
-  rm -f pkgsrc/advroute/etc/modules.advroute
-  rm -f pkgsrc/advroute/lib/modules/advroute/* 1>&2 > /dev/null
+  #rm -f pkgsrc/advroute/etc/modules.advroute
+  #rm -f pkgsrc/advroute/lib/modules/advroute/* 1>&2 > /dev/null
 
-  rm -f pkgsrc/bridge/etc/modules.bridge
-  rm -f pkgsrc/bridge/lib/modules/bridge/* 1>&2 > /dev/null
+  #rm -f pkgsrc/bridge/etc/modules.bridge
+  #rm -f pkgsrc/bridge/lib/modules/bridge/* 1>&2 > /dev/null
 
-  rm -f pkgsrc/l7filter/lib/modules/ipt_layer7.o 1>&2 > /dev/null
+  #rm -f pkgsrc/l7filter/lib/modules/ipt_layer7.o 1>&2 > /dev/null
 
-  rm -f pkgsrc/drivers/etc/modules.drivers
-  rm -f pkgsrc/drivers/lib/modules/drivers/* 1>&2 > /dev/null
+  #rm -f pkgsrc/drivers/etc/modules.drivers
+  #rm -f pkgsrc/drivers/lib/modules/drivers/* 1>&2 > /dev/null
 
-  rm -f pkgsrc/ppp/etc/etc/peers/*
-  rm -f pkgsrc/ppp/etc/etc/*-secrets
-  rm -f pkgsrc/ppp/etc/etc/*.chat
-  rm -f pkgsrc/ppp/etc/etc/options
+  #rm -f pkgsrc/ppp/etc/etc/peers/*
+  #rm -f pkgsrc/ppp/etc/etc/*-secrets
+  #rm -f pkgsrc/ppp/etc/etc/*.chat
+  #rm -f pkgsrc/ppp/etc/etc/options
 
   rm -f pkgsrc/etc/etc/ssh/ssh_host_key*
 
-  rm -f pkgsrc/language/var/http/language/*
+  #rm -f pkgsrc/language/var/http/language/*
 
   rm -f pkgsrc/root/dev/* > /dev/null
 }

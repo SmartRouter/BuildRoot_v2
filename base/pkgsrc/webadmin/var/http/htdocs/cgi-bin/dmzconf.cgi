@@ -13,7 +13,7 @@ if [ "$FORM_OKBTN" = "$Fsb" ]; then
 	DMZ_NETMASK3=$FORM_NETMASK3
 	cl_rebuildconf
 . /usr/sbin/write_state.sh
-        echo "<center><div id=alerta>BrazilFW - $Lyn<br>$Wtc</div></center>"
+        echo "<center><div id=alerta>SmartRouter - $Lyn<br>$Wtc</div></center>"
 else
 cat << CLEOF
 <form method="POST" action="/cgi-bin/dmzconf.cgi">

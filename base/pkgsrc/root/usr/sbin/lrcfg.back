@@ -33,7 +33,7 @@ if [ "$READONLY" = "no" ]; then
 	DO_SPECIAL=NO
  fi
 
-echo "Backing up your BrazilFW Configuration..."
+echo "Backing up your SmartRouter Configuration..."
 echo
 
 MOUNTCMD="mount -t $FSTYPE /dev/boot "

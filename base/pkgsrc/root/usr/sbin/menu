@@ -4,7 +4,7 @@
 [ -e "/tmp/reboot.tmp" ] && exit 0
 
 DIALOG=${DIALOG=dialog}
-BACKTITLE="BrazilFW Firewall and Router -- Configuration Menu"
+BACKTITLE="SmartRouter Project -- Configuration Menu"
 
 . /etc/coyote/coyote.conf
 . /tmp/netsubsys.state

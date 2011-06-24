@@ -46,7 +46,7 @@ call_script() {
 
 echo -n "$RED"
 centerscreen "¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤"
-centerscreen "¤     BrazilFW shutdown system 1.1     ¤"
+centerscreen "¤    SmartRouter shutdown system 1.1   ¤"
 centerscreen "¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤¤"
 echo "$NORMAL"
 
