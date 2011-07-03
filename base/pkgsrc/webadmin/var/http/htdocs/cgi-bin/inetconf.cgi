@@ -235,10 +235,10 @@ show_form_end "WAN4"
 show_form_D(){
 show_form_head
 add_title "DNS"
- form_info_item "$Afs $Ids" "" "$(input_text "DNS1" "${DNS1}" "20")"
- form_info_item "$Afs $Ids" "" "$(input_text "DNS2" "${DNS2}" "20")"
- form_info_item "$Afs $Ids" "" "$(input_text "DNS3" "${DNS3}" "20")"
- form_info_item "$Edn" "" "$(input_text "DOMAINNAME" "${DOMAINNAME}" "20")"
+form_info_item "$Afs $Ids" "" "$(input_text "DNS1" "${DNS1}" "20")"
+form_info_item "$And $Ids" "" "$(input_text "DNS2" "${DNS2}" "20")"
+form_info_item "$Ard $Ids" "" "$(input_text "DNS3" "${DNS3}" "20")"
+form_info_item "$Edn" "" "$(input_text "DOMAINNAME" "${DOMAINNAME}" "20")"
 show_form_end "DNS"
 }
 
