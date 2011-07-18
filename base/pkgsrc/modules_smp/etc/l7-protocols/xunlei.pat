@@ -1,2 +1,0 @@
-xunlei
-^[()]...?.?.?(reg|get|query)
