@@ -1,0 +1,3 @@
+/usr/sbin/mail
+/etc/mail.conf
+/var/lib/lrpkg/mail*

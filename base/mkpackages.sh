@@ -110,6 +110,7 @@ buildall() {
   buildpkg bridge
 #  buildpkg dhcpd
   buildpkg etc
+  buildpkg mail
   buildpkg iwtools
 #  buildpkg l7filter
   buildpkg root

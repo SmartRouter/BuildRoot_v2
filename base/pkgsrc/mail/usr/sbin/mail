@@ -1,0 +1,221 @@
+#!/bin/sh
+
+qt () { "$@" >/dev/null 2>&1 ; }
+
+b64=`which b64`
+
+eecho () {
+        echo "$@" >/dev/null >&2
+}
+
+smail () {	#usr/sbin
+
+  usage () {
+	echo "Usage: mail -options to email@domain.com"
+	echo "Options: -s subject"
+	echo "         -b body file         (send the file as a body message)"
+	echo "         -a file1,file2...    (attach files)"
+	echo "         -h host              (smtp server)"
+	echo "         -f from@domain.com   (sender e-mail)"
+	echo "         -n my_name           (sender name)"
+	echo "         -u user-Id           (sender user-id)"
+	echo "         -p password          (sender password)"
+	echo "         -l                   (do authentication login)"
+	echo "         -d                   (debug)"
+	echo ""
+	echo "Default mail settings are in /etc/mail.conf"
+  }
+ 
+  abort () {
+	eecho "Aborting due to $1"
+	eecho "  Killing child processes: $pidctrl $pidmnc"
+	qt kill $pidmnc
+	qt kill $pidctrl
+	exit 1
+  }
+
+  ctrl () {
+    exit1 () {
+	eecho "$nrep $vrep"
+	qt kill $pidmnc
+	kill -11 $proc
+	exit 1
+    }
+
+    getresponse () {
+	read nrep vrep
+    	if [ "$dodebug" = "yes" ] ; then eecho $nrep $vrep ; fi
+	x=${nrep%${nrep#?}}
+	if [ "$x" != "2" -a "$x" != "3" ] ; then exit1 ; fi
+    } < $prx
+
+    write () {
+     	if [ "$dodebug" = "yes" ] ; then eecho $@ ; fi
+    	echo "$@"
+    } 		
+
+    attach () {
+	if [ -f "$1" ] ; then
+		name=`echo $1 | sed 's/.*\///'`
+		write "--$ContentBoundry"
+		write "Content-Type: application/octet-stream; name=\"$name\""
+		write "Content-Transfer-Encoding: Base64"
+		write "Content-Disposition: attachment; filename=\"$name\""
+		if [ "$dodebug" = "yes" ] ; then eecho "**** Sending $name ****" ; fi
+ 		cat "$1" | $b64 -e > "$fatt"
+		cat "$fatt" | sed 's/^\./\.\./'
+	fi
+    }
+  																  
+	{
+
+	local wait=yes
+	trap "unset wait" 10
+	while [ "$wait" = "yes" ] ; do
+           echo > /dev/null
+	done
+				
+	getresponse
+	write "HELO $smtpserv"
+	getresponse
+	if [ "$dologin" = "yes" ] ; then
+		write "AUTH LOGIN"
+		getresponse
+		write "$user64"
+		getresponse
+		write "$pass64"
+		getresponse
+	fi
+	write "MAIL FROM:<$from>"
+	getresponse
+	write "RCPT TO:<$to>"
+	getresponse
+	write "DATA"
+	getresponse
+	write "Subject: $subject"
+	write "To: $to"
+ 	write "From: $name <$from>"
+	[ -n "$att" ] && {
+		write "Mime-Version: 1.0"
+		write "Content-Type: multipart/mixed; boundary=\"$ContentBoundry\""
+		write ""
+		write "--$ContentBoundry"
+		write 'Content-Type: text/plain; charset="iso-8859-1"'
+	}
+	write ""
+	if [ "$dodebug" = "yes" ] ; then eecho "**** Sending Message Body ****" ; fi
+	cat $fbody > $ptx
+
+ 	if [ -n "$att" ] ; then
+ 		eecho $att
+		for file in $att; do
+			attach $file
+		done
+		write "--$ContentBoundry--"
+	fi
+
+	write "."
+	getresponse
+ 	write "quit"
+	getresponse
+	kill -9 $pidmnc
+	} < $prx
+	kill -10 $proc
+	exit 0
+  }
+
+	[ $# -lt 1 ] && usage && exit 1
+ 	proc=$$
+
+	ContentBoundry="++++CoyoteMail++++$proc++++"
+
+	ptx="/tmp/smtp.tx.$proc"
+	prx="/tmp/smtp.rx.$proc"
+	fbody="/tmp/smtp.body.$proc"
+	fatt="/tmp/smtp.att.$proc"
+
+	mknod $ptx p;
+ 	mknod $prx p;
+	echo -n > $fbody
+	chmod 600 $ptx $prx $fbody
+
+	qt . /etc/mail.conf
+	
+	smtpserv="$SMTP_SERVER"
+	from="$SENDER_MAIL"
+	name="$SENDER_NAME"
+	subject="$DEFAULT_SUBJECT"
+	bodyfile="$DEFAULT_BODY_FILE"
+	att="$DEFAULT_ATTACH_FILE"
+	dologin=`echo $DO_AUTH_LOGIN | tr [A-Z] [a-z]`
+	user="$AUTH_USER"
+	pass="$AUTH_PASSWORD"
+	dodebug=`echo $DEBUG_MODE | tr [A-Z] [a-z]`
+	
+        while [ -n "$1" ] ; do
+		if [ "$1" = "-a" ] ; then att="$2" ; fi
+		if [ "$1" = "-h" ] ; then smtpserv="$2" ; fi
+		if [ "$1" = "-b" ] ; then bodyfile="$2" ; fi
+ 		if [ "$1" = "-s" ] ; then subject="$2" ; fi
+		if [ "$1" = "-f" ] ; then from="$2" ; fi
+		if [ "$1" = "-u" ] ; then user="$2" ; fi
+		if [ "$1" = "-p" ] ; then pass="$2" ; fi
+ 		if [ "$1" = "-n" ] ; then name="$2" ; fi
+ 		if [ "$1" = "-l" ] ; then dologin="yes" ; fi
+ 		if [ "$1" = "-d" ] ; then dodebug="yes" ; fi
+		if [ "$1" = "to" ] ; then to="$2" ; fi
+		shift
+        done
+
+	if [ -z "$smtpserv" ] ; then
+		usage
+		echo
+		echo "ERROR:"
+		echo "You need to informa a SMTP server."
+		exit 1	
+	fi
+
+	if [ -n "$from" -a -z "$user" ] ; then user=`echo "$from" | cut -f 1 -d @` ; fi
+ 	if [ -z "$name" ] ; then name="$from" ; fi
+
+	user64=`echo -n "$user" | $b64 -e`
+	pass64=`echo -n "$pass" | $b64 -e`
+
+	if [ -z "$bodyfile" ] ; then
+		while read line; do
+			echo $line | sed 's/^\./\.\./'
+		done > $fbody
+	else
+		cat $bodyfile > $fbody
+	fi			
+
+	att=`echo "$att" | sed 's/,/\ /g'`
+
+	# Abort signal from ctrl process
+	trap "abort \"connection error\"" 12
+
+	# Trap software aborts & kill child processes
+	trap "abort \"software signal\"" 1 2 6 9 15
+	trap "" 18 19 20
+	trap ":" 17
+
+	ctrl > $ptx &
+	pidctrl=$!
+	nc $smtpserv 25 < $ptx > $prx &
+	pidmnc=$!
+
+ 	kill -10 $pidctrl
+
+	wait2="yes"
+	trap "wait2=no" 10
+	trap "wait2=error" 11
+	while [ "$wait2" = "yes" ] ; do
+		echo > /dev/null	
+  	done
+
+	trap "qt rm -f $ptx $prx $fbody $fatt" 0
+	if [ "$wait2" != "error" ] ; then echo e-mail sent OK ; fi
+	exit 0
+}
+
+smail $@
