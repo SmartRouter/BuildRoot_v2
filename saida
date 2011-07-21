@@ -1,0 +1,7 @@
+commit 1718ed9f14b58530cdd445207790be6a91be9288
+Merge: 5f3446e 38601a1
+Author: fabiosammy <fabiosammy@smartrouter.com.br>
+Date:   Thu Jul 21 00:13:33 2011 -0300
+
+    Merge branch 'BETA-3.0' of ssh://smartrouter.git.sourceforge.net/gitroot/smartrouter/buildroot into BETA-3.0
+
