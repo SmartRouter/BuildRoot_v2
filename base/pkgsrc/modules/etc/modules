@@ -8,8 +8,8 @@ crypto/deflate
 #crypto/sha1
 #crypto/sha256
 #crypto/sha512
-#net/8021q/8021q
-#net/ipv4/ip_gre
+net/8021q/8021q
+net/ipv4/ip_gre
 #net/ipv4/ipip
 net/ipv4/netfilter/ip_conntrack hashsize=32768
 #net/ipv4/netfilter/ip_conntrack_amanda
@@ -80,11 +80,11 @@ drivers/net/bsd_comp
 drivers/net/ppp_deflate
 #drivers/net/ppp_mppe_mppc
 #drivers/net/slip
-#drivers/net/tun
-#drivers/net/bonding/bonding
+drivers/net/tun
+drivers/net/bonding/bonding
 drivers/net/imq
 drivers/net/mii
-#drivers/net/8390
+drivers/net/8390
 drivers/net/8139too
 drivers/net/e100/e100
 #drivers/net/eepro100
@@ -92,18 +92,18 @@ drivers/net/3c59x
 #drivers/net/dgrs
 #drivers/net/dmfe
 #drivers/net/fealnx
-#drivers/net/forcedeth
+drivers/net/forcedeth
 #drivers/net/natsemi
 #drivers/net/ne2k-pci
 drivers/net/pcnet32
-#drivers/net/sis190
-#drivers/net/sis900
-#drivers/net/sundance
-#drivers/net/tulip/tulip
-#drivers/net/typhoon
-#drivers/net/via-rhine
-#drivers/net/e1000/e1000
-#drivers/net/r8169
-#drivers/net/r1000
+drivers/net/sis190
+drivers/net/sis900
+drivers/net/sundance
+drivers/net/tulip/tulip
+drivers/net/typhoon
+drivers/net/via-rhine
+drivers/net/e1000/e1000
+drivers/net/r8169
+drivers/net/r1000
 drivers/net/sk98lin/sk98lin Moderation=Dynamic
-#drivers/net/dl2k
+drivers/net/dl2k
