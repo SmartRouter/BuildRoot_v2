@@ -20,7 +20,7 @@
 [ -z "$PING_RETRY_4" ] && PING_RETRY_4=3
 TIME=50
 
-PING="/usr/sbin/ping -U -Lq -Q 0x10 -c"
+PING="/bin/ping -U -Lq -Q 0x10 -c"
 ARPING="/usr/bin/arping -c 1 -I"
 ip="/usr/sbin/ip"
 
